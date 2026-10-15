@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src https://script.google.com https://script.googleusercontent.com; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#000000">
+<title>Foto nota · Portal Asia Group</title>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
+<link rel="stylesheet" href="kamera.css">
+</head>
+<body>
+<main class="app">
+
+<section id="kamera" class="kam" aria-label="Kamera nota" hidden>
+  <header class="kam-atas">
+    <button type="button" class="kam-x" id="kam-tutup" aria-label="Tutup kamera">✕</button>
+    <div class="kam-judul"><b id="kam-supplier"></b><span id="kam-info"></span></div>
+  </header>
+  <div class="kam-bidik" id="kam-bidik">
+    <video id="kam-video" playsinline muted autoplay></video>
+    <div class="kotak-bidik" id="kotak-bidik" aria-hidden="true"><i class="s tl"></i><i class="s tr"></i><i class="s bl"></i><i class="s br"></i></div>
+    <p class="kam-petunjuk" id="kam-petunjuk">Masukkan seluruh nota ke dalam kotak</p>
+  </div>
+  <div class="kam-bawah">
+    <div class="kam-bentuk" role="radiogroup" aria-label="Bentuk nota">
+      <button type="button" role="radio" aria-checked="true" data-bentuk="nota">Nota</button>
+      <button type="button" role="radio" aria-checked="false" data-bentuk="struk">Struk panjang</button>
+    </div>
+    <div class="kam-rana-baris">
+      <span class="kam-ket" id="kam-ket" role="status" aria-live="polite">Menyalakan kamera…</span>
+      <button type="button" class="kam-rana" id="kam-rana" aria-label="Ambil foto" disabled><i></i></button>
+      <span class="kam-ket kanan">Tegak lurus di atas nota, cahaya cukup</span>
+    </div>
+    <label class="kam-bawaan">Foto kurang jelas? Pakai kamera bawaan HP<input type="file" class="pilih-foto" accept="image/*" capture="environment"></label>
+  </div>
+</section>
+
+<section id="kirim" class="layar" aria-label="Kirim foto nota" hidden>
+  <header class="atas">
+    <button type="button" class="kembali" id="t-kembali">‹ Daftar nota</button>
+    <h1 class="judul" id="kirim-judul"></h1>
+    <p class="sub" id="kirim-sub"></p>
+  </header>
+  <div class="isi">
+    <div class="thumbs" id="thumbs"></div>
+    <ol class="alur-kirim" id="alur">
+      <li data-langkah="1"><i aria-hidden="true"></i><div><b>Dipotong sesuai kotak</b><span id="langkah1-ket">Hanya isi kotak yang dikirim</span></div></li>
+      <li data-langkah="2"><i aria-hidden="true"></i><div><b>Dikirim ke Portal</b><span id="langkah2-ket"></span></div></li>
+      <li data-langkah="3"><i aria-hidden="true"></i><div><b>Masuk laporan harian</b><span>Dicek Purchasing pusat, lalu diunduh untuk Finance</span></div></li>
+    </ol>
+    <p class="hasil" id="hasil" role="status" aria-live="polite" hidden></p>
+    <div class="aksi" id="aksi-ok" hidden>
+      <button type="button" class="btn primer" id="t-selesai">Selesai</button>
+      <div class="dua">
+        <button type="button" class="btn" id="t-tambah"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Tambah halaman</button>
+        <button type="button" class="btn" id="t-ganti">Foto ulang</button>
+      </div>
+      <p class="catatan" id="t-batas" hidden>Paling banyak 6 halaman per nota.</p>
+    </div>
+    <div class="aksi" id="aksi-ulang" hidden>
+      <button type="button" class="btn primer" id="t-kirim-ulang">Kirim ulang</button>
+      <button type="button" class="btn" id="t-foto-lagi">Foto ulang</button>
+    </div>
+    <div class="aksi" id="aksi-tutup" hidden>
+      <button type="button" class="btn primer" id="t-tutup">Tutup halaman</button>
+      <button type="button" class="btn" id="t-foto-lagi2" hidden>Foto ulang</button>
+    </div>
+  </div>
+</section>
+
+<section id="tolak" class="layar" aria-label="Kamera belum menyala" hidden>
+  <header class="atas">
+    <div class="merk">Portal Asia Group · Supply Chain</div>
+    <h1 class="judul" id="tolak-judul">Kamera belum menyala</h1>
+    <p class="sub" id="tolak-sub"></p>
+  </header>
+  <div class="isi">
+    <p class="hasil tunggu" id="tolak-isi"></p>
+    <div class="aksi">
+      <label class="btn primer unggah">Pakai kamera bawaan HP<input type="file" class="pilih-foto" accept="image/*" capture="environment"></label>
+      <button type="button" class="btn" id="t-coba-kamera">Coba nyalakan kamera lagi</button>
+    </div>
+  </div>
+</section>
+
+<section id="pesan" class="layar" aria-label="Foto nota" hidden>
+  <header class="atas">
+    <div class="merk">Portal Asia Group · Supply Chain</div>
+    <h1 class="judul" id="pesan-judul">Foto nota</h1>
+  </header>
+  <div class="isi">
+    <p class="hasil info" id="pesan-isi"></p>
+    <div class="aksi"><button type="button" class="btn primer" id="t-tutup2">Tutup halaman</button></div>
+  </div>
+</section>
+
+<div class="pop" id="pop" hidden>
+  <div class="pop-kotak" role="alertdialog" aria-modal="true" aria-labelledby="pop-judul" aria-describedby="pop-isi">
+    <h2 id="pop-judul"></h2>
+    <p id="pop-isi"></p>
+    <button type="button" class="btn primer" id="pop-tombol"></button>
+  </div>
+</div>
+
+</main>
+<script src="kamera.js"></script>
+</body>
+</html>
