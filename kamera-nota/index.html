@@ -6,75 +6,97 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src https://script.google.com https://script.googleusercontent.com; base-uri 'none'; form-action 'none'">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#ffffff" id="warna-tema">
 <title>Foto nota · Portal Asia Group</title>
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="kamera.css?v=3">
+<link rel="stylesheet" href="kamera.css?v=4">
 </head>
 <body>
+<svg class="ikon-sumber" aria-hidden="true" focusable="false">
+  <symbol id="i-kamera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13.5" r="3.5"/></symbol>
+  <symbol id="i-sampah" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3"/></symbol>
+  <symbol id="i-cek" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-petir" viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/></symbol>
+  <symbol id="i-petir-mati" viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/><path d="M3 3l18 18"/></symbol>
+  <symbol id="i-hp" viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+</svg>
 <main class="app">
 
-<section id="kamera" class="kam" aria-label="Kamera nota" hidden>
+<section id="nota" class="layar layar-nota" aria-label="Foto nota" hidden>
+  <header class="atas">
+    <div class="atas-baris">
+      <button type="button" class="kembali" id="n-kembali">‹ Daftar nota</button>
+      <span class="pil-jenis" id="n-jenis"></span>
+    </div>
+    <h1 class="judul" id="n-judul"></h1>
+    <p class="sub" id="n-sub"></p>
+  </header>
+  <div class="isi isi-nota">
+    <div class="keadaan" id="n-keadaan" role="note" hidden>
+      <b id="k-judul"></b>
+      <span class="k-catatan" id="k-catatan"></span>
+      <span class="k-oleh" id="k-oleh"></span>
+      <span class="k-aksi" id="k-aksi"></span>
+    </div>
+    <div class="slot" id="slot-nota" data-apa="nota"></div>
+    <div class="slot" id="slot-barang" data-apa="barang"></div>
+  </div>
+  <footer class="kaki">
+    <button type="button" class="btn primer" id="n-selesai" disabled aria-describedby="n-selesai-ket">Selesai</button>
+    <p class="catatan" id="n-selesai-ket">Foto nota dan foto barang dulu.</p>
+  </footer>
+</section>
+
+<section id="kamera" class="kam" aria-label="Kamera" hidden>
   <header class="kam-atas">
-    <button type="button" class="kam-x" id="kam-tutup" aria-label="Tutup kamera">✕</button>
-    <div class="kam-judul"><b id="kam-supplier"></b><span id="kam-info"></span></div>
+    <button type="button" class="kam-x" id="kam-tutup" aria-label="Tutup kamera, kembali ke nota">✕</button>
+    <div class="kam-judul"><b id="kam-apa"></b><span id="kam-kertas"></span></div>
   </header>
   <div class="kam-bidik" id="kam-bidik">
     <video id="kam-video" playsinline muted autoplay></video>
     <div class="kotak-bidik" id="kotak-bidik" aria-hidden="true"><i class="s tl"></i><i class="s tr"></i><i class="s bl"></i><i class="s br"></i></div>
-    <p class="kam-petunjuk" id="kam-petunjuk">Masukkan seluruh nota ke dalam kotak</p>
+    <p class="kam-petunjuk" id="kam-petunjuk"></p>
+    <p class="kam-ket" id="kam-ket" role="status" aria-live="polite">Menyalakan kamera…</p>
   </div>
   <div class="kam-bawah">
-    <div class="kam-bentuk" role="radiogroup" aria-label="Bentuk nota">
-      <button type="button" role="radio" aria-checked="true" data-bentuk="nota">Nota</button>
-      <button type="button" role="radio" aria-checked="false" data-bentuk="struk">Struk panjang</button>
+    <div class="kam-sisi">
+      <button type="button" class="kam-alat" id="kam-flash" aria-pressed="true" hidden><svg aria-hidden="true"><use href="#i-petir"/></svg><span>Flash</span></button>
     </div>
-    <div class="kam-rana-baris">
-      <span class="kam-ket" id="kam-ket" role="status" aria-live="polite">Menyalakan kamera…</span>
-      <button type="button" class="kam-rana" id="kam-rana" aria-label="Ambil foto" disabled><i></i></button>
-      <span class="kam-ket kanan" id="kam-saran">Tegak lurus di atas nota, cahaya cukup</span>
+    <button type="button" class="kam-rana" id="kam-rana" aria-label="Ambil foto" disabled><i></i></button>
+    <div class="kam-sisi">
+      <label class="kam-alat"><svg aria-hidden="true"><use href="#i-hp"/></svg><span>Kamera HP</span><input type="file" class="pilih-foto" accept="image/*" capture="environment" aria-label="Pakai kamera bawaan HP"></label>
     </div>
-    <label class="kam-bawaan">Foto kurang jelas? Pakai kamera bawaan HP<input type="file" class="pilih-foto" accept="image/*" capture="environment"></label>
   </div>
 </section>
 
-<section id="kirim" class="layar" aria-label="Kirim foto nota" hidden>
+<section id="kirim" class="layar" aria-label="Kirim foto" hidden>
   <header class="atas">
-    <button type="button" class="kembali" id="t-kembali">‹ Daftar nota</button>
+    <button type="button" class="kembali" id="t-kembali" hidden>‹ Kembali</button>
     <h1 class="judul" id="kirim-judul"></h1>
     <p class="sub" id="kirim-sub"></p>
   </header>
   <div class="isi">
-    <div class="thumbs" id="thumbs"></div>
+    <figure class="kirim-foto" id="kirim-foto"><img id="kirim-img" alt="" hidden></figure>
     <ol class="alur-kirim" id="alur">
-      <li data-langkah="1"><i aria-hidden="true"></i><div><b id="langkah1-judul">Dipotong sesuai kotak</b><span id="langkah1-ket"></span></div></li>
-      <li data-langkah="2"><i aria-hidden="true"></i><div><b>Dikirim ke Portal</b><span id="langkah2-ket"></span></div></li>
-      <li data-langkah="3"><i aria-hidden="true"></i><div><b>Masuk laporan harian</b></div></li>
+      <li data-langkah="1"><i aria-hidden="true"></i><div><b id="langkah1-judul">Merapikan foto…</b></div></li>
+      <li data-langkah="2"><i aria-hidden="true"></i><div><b id="langkah2-judul">Mengirim ke Portal…</b><span id="langkah2-ket"></span></div></li>
+      <li data-langkah="3"><i aria-hidden="true"></i><div><b id="langkah3-judul">Masuk Laporan harian…</b></div></li>
     </ol>
     <p class="hasil" id="hasil" role="status" aria-live="polite" hidden></p>
-    <div class="aksi" id="aksi-ok" hidden>
-      <button type="button" class="btn primer" id="t-barang" hidden>Lanjut: foto barang</button>
-      <button type="button" class="btn primer" id="t-selesai">Selesai</button>
-      <div class="dua">
-        <button type="button" class="btn" id="t-tambah"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Tambah halaman</button>
-        <button type="button" class="btn" id="t-ganti">Foto ulang</button>
-      </div>
-      <p class="catatan" id="t-batas" hidden>Paling banyak 6 halaman per nota.</p>
-    </div>
     <div class="aksi" id="aksi-ulang" hidden>
       <button type="button" class="btn primer" id="t-kirim-ulang">Kirim ulang</button>
       <button type="button" class="btn" id="t-foto-lagi">Foto ulang</button>
     </div>
     <div class="aksi" id="aksi-tutup" hidden>
       <button type="button" class="btn primer" id="t-tutup">Tutup halaman</button>
-      <button type="button" class="btn" id="t-foto-lagi2" hidden>Foto ulang</button>
     </div>
   </div>
 </section>
 
 <section id="tolak" class="layar" aria-label="Kamera belum menyala" hidden>
   <header class="atas">
+    <button type="button" class="kembali" id="t-tolak-kembali">‹ Kembali</button>
     <h1 class="judul" id="tolak-judul">Kamera belum menyala</h1>
     <p class="sub" id="tolak-sub"></p>
   </header>
@@ -97,6 +119,17 @@
   </div>
 </section>
 
+<div class="pop" id="tanya" hidden>
+  <div class="pop-kotak" role="alertdialog" aria-modal="true" aria-labelledby="tanya-judul" aria-describedby="tanya-isi">
+    <h2 id="tanya-judul"></h2>
+    <p id="tanya-isi">Foto ini hilang dari Laporan harian. Anda bisa memotret lagi.</p>
+    <div class="pop-dua">
+      <button type="button" class="btn" id="tanya-batal">Batal</button>
+      <button type="button" class="btn bahaya" id="tanya-hapus">Hapus</button>
+    </div>
+  </div>
+</div>
+
 <div class="pop" id="pop" hidden>
   <div class="pop-kotak" role="alertdialog" aria-modal="true" aria-labelledby="pop-judul" aria-describedby="pop-isi">
     <h2 id="pop-judul"></h2>
@@ -106,6 +139,6 @@
 </div>
 
 </main>
-<script src="kamera.js?v=3"></script>
+<script src="kamera.js?v=4"></script>
 </body>
 </html>
