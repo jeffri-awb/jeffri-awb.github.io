@@ -10,7 +10,7 @@
 <title>Foto nota · Portal Asia Group</title>
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="kamera.css">
+<link rel="stylesheet" href="kamera.css?v=3">
 </head>
 <body>
 <main class="app">
@@ -33,7 +33,7 @@
     <div class="kam-rana-baris">
       <span class="kam-ket" id="kam-ket" role="status" aria-live="polite">Menyalakan kamera…</span>
       <button type="button" class="kam-rana" id="kam-rana" aria-label="Ambil foto" disabled><i></i></button>
-      <span class="kam-ket kanan">Tegak lurus di atas nota, cahaya cukup</span>
+      <span class="kam-ket kanan" id="kam-saran">Tegak lurus di atas nota, cahaya cukup</span>
     </div>
     <label class="kam-bawaan">Foto kurang jelas? Pakai kamera bawaan HP<input type="file" class="pilih-foto" accept="image/*" capture="environment"></label>
   </div>
@@ -48,12 +48,13 @@
   <div class="isi">
     <div class="thumbs" id="thumbs"></div>
     <ol class="alur-kirim" id="alur">
-      <li data-langkah="1"><i aria-hidden="true"></i><div><b>Dipotong sesuai kotak</b><span id="langkah1-ket">Hanya isi kotak yang dikirim</span></div></li>
+      <li data-langkah="1"><i aria-hidden="true"></i><div><b id="langkah1-judul">Dipotong sesuai kotak</b><span id="langkah1-ket"></span></div></li>
       <li data-langkah="2"><i aria-hidden="true"></i><div><b>Dikirim ke Portal</b><span id="langkah2-ket"></span></div></li>
-      <li data-langkah="3"><i aria-hidden="true"></i><div><b>Masuk laporan harian</b><span>Dicek Purchasing pusat, lalu diunduh untuk Finance</span></div></li>
+      <li data-langkah="3"><i aria-hidden="true"></i><div><b>Masuk laporan harian</b></div></li>
     </ol>
     <p class="hasil" id="hasil" role="status" aria-live="polite" hidden></p>
     <div class="aksi" id="aksi-ok" hidden>
+      <button type="button" class="btn primer" id="t-barang" hidden>Lanjut: foto barang</button>
       <button type="button" class="btn primer" id="t-selesai">Selesai</button>
       <div class="dua">
         <button type="button" class="btn" id="t-tambah"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Tambah halaman</button>
@@ -74,7 +75,6 @@
 
 <section id="tolak" class="layar" aria-label="Kamera belum menyala" hidden>
   <header class="atas">
-    <div class="merk">Portal Asia Group · Supply Chain</div>
     <h1 class="judul" id="tolak-judul">Kamera belum menyala</h1>
     <p class="sub" id="tolak-sub"></p>
   </header>
@@ -89,7 +89,6 @@
 
 <section id="pesan" class="layar" aria-label="Foto nota" hidden>
   <header class="atas">
-    <div class="merk">Portal Asia Group · Supply Chain</div>
     <h1 class="judul" id="pesan-judul">Foto nota</h1>
   </header>
   <div class="isi">
@@ -107,6 +106,6 @@
 </div>
 
 </main>
-<script src="kamera.js"></script>
+<script src="kamera.js?v=3"></script>
 </body>
 </html>

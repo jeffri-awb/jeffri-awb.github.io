@@ -1,8 +1,12 @@
 'use strict';
-/* Kamera nota v2 — Portal Asia Group · Supply Chain (kontrak: laporan-scm-finance-2026-10-14/BUILD.md § 5).
+/* Kamera nota v3 — Portal Asia Group · Supply Chain (kontrak: laporan-scm-finance-2026-10-14/BUILD.md § 5,
+   foto-nota-v405-2026-10-16/BUILD.md § 6).
    Dibuka Portal (menu Foto nota) di tab baru:
      #v=2&api=<alamat exec>&t=<token foto>&o=<idOutlet>&on=<nama cabang>&f=<faktur>&s=<supplier>&g=<total>
-      &tgl=<yyyy-mm-dd>&m=<baru|tambah|ganti>&set=<idSet>&hal=<halaman>
+      &tgl=<yyyy-mm-dd>&m=<baru|tambah|ganti|barang>&set=<idSet>&hal=<halaman>&j=<nomor di kertas supplier>
+   - v3 (Portal v405): mode `barang` (foto barang tanpa bingkai, butuh set), `j` (nomor surat jalan/invoice yang
+     ditulis besar), dan pemeriksaan token foto begitu halaman dibuka (doPost jenis nota-token). Alamat dari Portal
+     v403 (tanpa j, tanpa barang) tetap jalan seperti v2.
    - Fragmen (#) tidak terkirim ke hosting dan langsung dihapus dari alamat. Salinannya hanya di sessionStorage tab
      ini, supaya muat ulang tetap jalan.
    - Foto hanya di memori halaman: tidak ada salinan di galeri HP dan tidak ada yang tersimpan di hosting.
@@ -17,16 +21,18 @@
   const SISI_MAKS = 1600, BITA_MAKS = 330 * 1024, HAL_MAKS = 6;
   const JEDA_ULANG = UJI.jeda || [1000, 3000, 7000];
   const BATAS_TUNGGU = UJI.batas || 25000;
+  const BATAS_PERIKSA = UJI.batasPeriksa || 15000;
   const KUNCI_SESI = 'kamera-nota-v2', KUNCI_BENTUK = 'kamera-nota-bentuk';
   const KODE_ULANG = new Set(['sibuk', 'belum-pasti', 'gagal']);
-  const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober',
-    'November', 'Desember'];
+  /* Pemeriksaan awal hanya bertindak atas jawaban yang pasti berarti "kiriman nanti akan ditolak". Jawaban lain
+     (Portal v403 yang belum mengenal pemeriksaan ini, sibuk, gagal, sinyal putus) didiamkan: unggah tetap memeriksa. */
+  const KODE_PERIKSA = new Set(['token', 'sesi', 'akses', 'lihat']);
   const BULAN_PENDEK = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
   /* Kabar gagal (BUILD.md § 9): [judul, isi, tombol, tindakan]. tindakan 'ulang' = kirim lagi foto yang sama,
      'tutup' = tidak ada yang bisa dilakukan dari halaman ini, kembali ke Portal. */
   const KABAR = {
-    token: ['Halaman kamera sudah lama terbuka', 'Tutup halaman ini, lalu buka lagi dari Portal.', 'Tutup', 'tutup'],
+    token: ['Buka lagi dari Portal', 'Tutup halaman ini, kembali ke Portal, lalu pilih notanya lagi.', 'Tutup', 'tutup'],
     akses: ['Belum ada akses', 'Akun ini belum diberi akses untuk ini. Minta Pak Jeffri menambahkannya di Akun & akses.',
       'Tutup', 'tutup'],
     lihat: ['Mode lihat saja', 'Anda sedang melihat sebagai akun lain, jadi tidak bisa menyimpan.', 'Tutup', 'tutup'],
@@ -45,7 +51,8 @@
 
   const S = {
     p: null, mode: 'baru', idSet: '', hal: 0, bentuk: 'nota', stream: null, nomorKamera: 0, layar: '',
-    foto: null, sibuk: false, halaman: [], nHalaman: 0, halTerakhir: 0, terkirim: false
+    foto: null, sibuk: false, halaman: [], nHalaman: 0, halTerakhir: 0, terkirim: false,
+    barang: '', terakhir: '', nomorPeriksa: 0
   };
 
   /* ---------- bantuan kecil ---------- */
@@ -63,10 +70,6 @@
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
     return m ? Number(m[3]) + ' ' + BULAN_PENDEK[Number(m[2]) - 1] + ' ' + m[1] : '';
   }
-  function bulanTahun(t) {
-    const m = /^(\d{4})-(\d{2})/.exec(t);
-    return m ? BULAN[Number(m[2]) - 1] + ' ' + m[1] : '';
-  }
   function bita(url) {
     const n = url.length - url.indexOf(',') - 1;
     return n * 3 / 4 - (url.endsWith('==') ? 2 : url.endsWith('=') ? 1 : 0);
@@ -78,7 +81,8 @@
   function bacaFragmen(h) {
     const q = new URLSearchParams(String(h || '').replace(/^#/, ''));
     const p = {};
-    ['v', 'api', 't', 'o', 'on', 'f', 's', 'g', 'tgl', 'm', 'set', 'hal'].forEach(k => { p[k] = (q.get(k) || '').trim(); });
+    ['v', 'api', 't', 'o', 'on', 'f', 's', 'g', 'tgl', 'm', 'set', 'hal', 'j'].forEach(k => { p[k] = (q.get(k) || '').trim(); });
+    p.j = p.j.slice(0, 64).trim();
     return sah(p) ? p : null;
   }
   function sah(p) {
@@ -88,13 +92,18 @@
       && /^[A-Za-z0-9_-]{2,40}$/.test(p.o)
       && typeof p.f === 'string' && p.f.length > 0 && p.f.length <= 64
       && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(p.tgl)
-      && /^(baru|tambah|ganti)$/.test(p.m)
+      && /^(baru|tambah|ganti|barang)$/.test(p.m)
       && (p.m === 'baru' || /^[A-Za-z0-9_-]{6,64}$/.test(p.set))
-      && (p.m !== 'ganti' || /^[1-6]$/.test(p.hal));
+      && (p.m !== 'ganti' || /^[1-6]$/.test(p.hal))
+      && (p.j === undefined || (typeof p.j === 'string' && p.j.length <= 64));
   }
   function simpanSesi(p) { try { sessionStorage.setItem(KUNCI_SESI, JSON.stringify(p)); } catch (e) { /* tanpa simpanan: muat ulang minta buka dari Portal */ } }
   function bacaSesi() {
-    try { const p = JSON.parse(sessionStorage.getItem(KUNCI_SESI) || 'null'); return sah(p) ? p : null; } catch (e) { return null; }
+    try {
+      const p = JSON.parse(sessionStorage.getItem(KUNCI_SESI) || 'null');
+      if (p && typeof p === 'object' && p.j === undefined) p.j = '';     // salinan yang ditulis v2
+      return sah(p) ? p : null;
+    } catch (e) { return null; }
   }
   function hapusSesi() { try { sessionStorage.removeItem(KUNCI_SESI); } catch (e) { /* abaikan */ } }
 
@@ -104,18 +113,33 @@
     ['kamera', 'kirim', 'tolak', 'pesan'].forEach(n => { $(n).hidden = n !== nama; });
     if (nama === 'kamera') letakKotak();
   }
+  /* v3 (BUILD v405 § 6): baris tebal = nomor di kertas supplier (j) bila ada, selain itu supplier; nomor WePOS
+     (RL…/P-…) tidak lagi ditonjolkan karena admin mencocokkan kertas, bukan nomor WePOS. */
   function isiKepala() {
-    const p = S.p;
-    $('kam-supplier').textContent = p.s || p.f;
-    let info = p.f + (rupiah(p.g) ? ' · ' + rupiah(p.g) : '');
-    if (S.mode === 'ganti') info += ' · foto ulang halaman ' + S.hal;
-    else if (S.mode === 'tambah') info += S.nHalaman ? ' · halaman ' + (S.nHalaman + 1) : ' · halaman tambahan';
+    const p = S.p, tebal = p.j || p.s || p.f;
+    $('kam-supplier').textContent = tebal;
+    let info = [p.j ? p.s : '', rupiah(p.g)].filter(Boolean).join(' · ');
+    if (S.mode === 'barang') info = ['Foto barang', info].filter(Boolean).join(' · ');
+    else if (S.mode === 'ganti') info = [info, 'foto ulang halaman ' + S.hal].filter(Boolean).join(' · ');
+    else if (S.mode === 'tambah') info = [info, S.nHalaman ? 'halaman ' + (S.nHalaman + 1) : 'halaman tambahan'].filter(Boolean).join(' · ');
     $('kam-info').textContent = info;
-    $('kirim-judul').textContent = p.f;
+    $('kirim-judul').textContent = p.j || p.f;
     $('kirim-sub').textContent = [p.s, p.on, tanggalPendek(p.tgl)].filter(Boolean).join(' · ');
-    $('tolak-sub').textContent = [p.f, p.s].filter(Boolean).join(' · ');
+    $('tolak-sub').textContent = [tebal, tebal === p.s ? '' : p.s].filter(Boolean).join(' · ');
   }
-  function tujuan() { return ['Bukti nota', S.p.on, bulanTahun(S.p.tgl)].filter(Boolean).join(' · '); }
+  /* Mode barang (BUILD v405 § 6): tanpa bingkai kotak dan tanpa pilihan Nota/Struk; yang dikirim seluruh bidang
+     yang terlihat. */
+  function aturMode() {
+    const barang = S.mode === 'barang';
+    $('kamera').classList.toggle('barang', barang);
+    if (barang) {
+      $('kam-petunjuk').textContent = 'Foto semua barang yang diterima';
+      $('kam-saran').textContent = 'Cahaya cukup, semua barang terlihat';
+    } else {
+      pilihBentuk(S.bentuk, false);
+      $('kam-saran').textContent = 'Tegak lurus di atas nota, cahaya cukup';
+    }
+  }
   function langkah(n, keadaan, teks) {
     const li = document.querySelector('#alur li[data-langkah="' + n + '"]');
     li.className = keadaan || '';
@@ -137,7 +161,9 @@
   function gambarKecil() {
     const daftar = S.halaman.map(x => ({hal: x.hal, url: x.url}));
     const F = S.foto;
-    if (F) {
+    let barang = S.barang;
+    if (F && F.mode === 'barang') barang = F.url;
+    else if (F) {
       if (F.mode === 'ganti') {
         const i = daftar.findIndex(x => x.hal === F.hal);
         if (i >= 0) daftar[i] = {hal: F.hal, url: F.url}; else daftar.push({hal: F.hal, url: F.url});
@@ -145,6 +171,7 @@
         daftar.push({hal: S.nHalaman ? S.nHalaman + 1 : F.mode === 'baru' ? 1 : 0, url: F.url});
       }
     }
+    if (barang) daftar.push({barang: true, url: barang});
     const wadah = $('thumbs');
     wadah.textContent = '';
     daftar.forEach(x => {
@@ -152,9 +179,9 @@
       fig.className = 'thumb';
       const img = document.createElement('img');
       img.src = x.url;
-      img.alt = 'Nota ' + S.p.f + (x.hal ? ' halaman ' + x.hal : ' halaman tambahan');
+      img.alt = x.barang ? 'Foto barang ' + S.p.f : 'Nota ' + S.p.f + (x.hal ? ' halaman ' + x.hal : ' halaman tambahan');
       const cap = document.createElement('figcaption');
-      cap.textContent = x.hal ? 'Hal. ' + x.hal : 'Halaman baru';
+      cap.textContent = x.barang ? 'Barang' : x.hal ? 'Hal. ' + x.hal : 'Halaman baru';
       fig.append(img, cap);
       wadah.append(fig);
     });
@@ -190,6 +217,7 @@
 
   /* ---------- kamera ---------- */
   function letakKotak() {
+    if (S.mode === 'barang') return;
     const b = $('kam-bidik'), k = $('kotak-bidik'), r = BENTUK[S.bentuk];
     const W = b.clientWidth, H = b.clientHeight;
     if (!W || !H) return;
@@ -218,6 +246,7 @@
   async function bukaKamera() {
     tutupPopup(false);
     matikanKamera();
+    aturMode();
     tampil('kamera');
     isiKepala();
     const nomor = S.nomorKamera, rana = $('kam-rana');
@@ -252,11 +281,13 @@
   }
   function kameraGagal(nama) {
     matikanKamera();
+    /* v3 (BUILD v405 § 7): kalimat pendek, tanpa petunjuk ikon gembok (itu cara di komputer). HP bisa menolak
+       kamera saat aplikasi lain merekam suara (uji Pekanbaru 16 Okt 12.12). */
     const ditolak = nama === 'NotAllowedError' || nama === 'SecurityError';
-    $('tolak-judul').textContent = ditolak ? 'Kamera belum diizinkan' : 'Kamera belum menyala';
+    $('tolak-judul').textContent = ditolak ? 'Kamera belum bisa dibuka' : 'Kamera belum menyala';
     $('tolak-isi').textContent = ditolak
-      ? 'Izinkan kamera untuk halaman ini (ikon gembok di samping alamat), lalu tekan Coba nyalakan kamera lagi. Bisa juga langsung pakai kamera bawaan HP.'
-      : 'Kamera HP sedang dipakai aplikasi lain atau tidak terbaca. Tutup aplikasi kamera lain, lalu tekan Coba nyalakan kamera lagi. Bisa juga langsung pakai kamera bawaan HP.';
+      ? 'HP menolak kamera. Coba lagi, atau pakai kamera bawaan HP.'
+      : 'Kamera sedang dipakai aplikasi lain. Coba lagi, atau pakai kamera bawaan HP.';
     tampil('tolak');
   }
 
@@ -288,10 +319,13 @@
     const vw = v.videoWidth, vh = v.videoHeight, W = b.clientWidth, H = b.clientHeight;
     if (!S.stream || !vw || !vh || !W || !H) return;
     $('kam-rana').disabled = true;
-    /* video tampil dengan object-fit: cover, jadi petakan kotak di layar ke piksel video */
+    /* video tampil dengan object-fit: cover, jadi petakan kotak di layar ke piksel video. Mode barang: seluruh
+       bidang yang terlihat (tanpa kotak). */
     const s = Math.max(W / vw, H / vh), ox = (W - vw * s) / 2, oy = (H - vh * s) / 2;
-    const sx = Math.max(0, (k.offsetLeft - ox) / s), sy = Math.max(0, (k.offsetTop - oy) / s);
-    const sw = Math.min(k.offsetWidth / s, vw - sx), sh = Math.min(k.offsetHeight / s, vh - sy);
+    const barang = S.mode === 'barang';
+    const kx = barang ? 0 : k.offsetLeft, ky = barang ? 0 : k.offsetTop, kw = barang ? W : k.offsetWidth, kh = barang ? H : k.offsetHeight;
+    const sx = Math.max(0, (kx - ox) / s), sy = Math.max(0, (ky - oy) / s);
+    const sw = Math.min(kw / s, vw - sx), sh = Math.min(kh / s, vh - sy);
     let c = null;
     try { c = potong(v, sx, sy, sw, sh); } catch (e) { c = null; }
     matikanKamera();
@@ -308,8 +342,10 @@
     hasilKotak(null);
     $('t-kembali').hidden = true;
     gambarKecil();
-    langkah(1, 'jalan', sumber === 'kamera' ? 'Hanya isi kotak yang dikirim' : 'Diperkecil supaya cepat terkirim');
-    langkah(2, '', tujuan());
+    /* v3: tanpa kalimat keterangan di bawah tiap langkah (layar admin dipangkas, BUILD v405 § 5.3/§ 6) */
+    $('langkah1-judul').textContent = sumber === 'kamera' && S.mode !== 'barang' ? 'Dipotong sesuai kotak' : 'Diperkecil';
+    langkah(1, 'jalan', '');
+    langkah(2, '', '');
     langkah(3, '');
     sesudahGambar(() => {
       let hasil = null;
@@ -337,8 +373,9 @@
     try { g = await bacaGambar(berkas); } catch (e) { return gagalFoto(); }
     const W = g.img.naturalWidth, H = g.img.naturalHeight, r = BENTUK[S.bentuk];
     let sx = 0, sy = 0, sw = W, sh = H;
-    /* foto tegak: potong tengah mendekati bentuk kotak, paling banyak seperlima tiap ukuran supaya nota tidak terpotong */
-    if (H >= W) {
+    /* foto tegak: potong tengah mendekati bentuk kotak, paling banyak seperlima tiap ukuran supaya nota tidak terpotong.
+       Foto barang tidak dipotong. */
+    if (H >= W && S.mode !== 'barang') {
       if (W / H > r) { sw = Math.max(H * r, W * 0.8); sx = (W - sw) / 2; } else { sh = Math.max(W / r, H * 0.8); sy = (H - sh) / 2; }
     }
     let c = null;
@@ -349,9 +386,9 @@
   }
 
   /* ---------- kirim ke Portal ---------- */
-  async function kirimSekali(badan) {
+  async function kirimSekali(badan, batas) {
     const ac = typeof AbortController === 'function' ? new AbortController() : null;
-    const jam = setTimeout(() => { if (ac) ac.abort(); }, BATAS_TUNGGU);
+    const jam = setTimeout(() => { if (ac) ac.abort(); }, batas || BATAS_TUNGGU);
     try {
       const r = await fetch(S.p.api, {method: 'POST', body: badan, headers: {'Content-Type': 'text/plain;charset=utf-8'},
         redirect: 'follow', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer',
@@ -372,7 +409,7 @@
     aksi(null);
     hasilKotak(null);
     $('t-kembali').hidden = true;
-    langkah(2, 'jalan', tujuan());
+    langkah(2, 'jalan', '');
     const badan = JSON.stringify({jenis: 'nota-foto', t: S.p.t, idOutlet: S.p.o, idFoto: F.idFoto, idSet: F.idSet,
       mode: F.mode, hal: F.mode === 'ganti' ? F.hal : '', faktur: S.p.f, tanggal: S.p.tgl, foto: F.url, w: F.w, h: F.h,
       sumber: F.sumber});
@@ -391,25 +428,44 @@
     S.sibuk = false;
     gagalKirim(akhir);
   }
+  /* v3: jawaban Portal v405 membawa perluBarang/adaBarang (BUILD v405 § 4.2). Nota terkirim tapi foto barang wajib
+     belum ada → tombol utama "Lanjut: foto barang". Jawaban Portal v403 tanpa dua medan itu = rupa v2. */
   function berhasil(j, F) {
     S.idSet = String(j.idSet || F.idSet);
-    const hal = Number(j.halaman) || (F.mode === 'ganti' ? F.hal : S.halaman.length + 1);
-    const i = S.halaman.findIndex(x => x.hal === hal);
-    if (i >= 0) S.halaman[i] = {hal, url: F.url}; else S.halaman.push({hal, url: F.url});
-    S.halaman.sort((a, b) => a.hal - b.hal);
-    S.nHalaman = Math.max(Number(j.nHalaman) || 0, hal, S.halaman.length);
-    S.halTerakhir = hal;
     S.terkirim = true;
     S.foto = null;
-    /* muat ulang sesudah ini melanjutkan nota yang sama sebagai halaman tambahan, bukan nota baru */
-    simpanSesi(Object.assign({}, S.p, {m: 'tambah', set: S.idSet, hal: ''}));
+    const perluBarang = j.perluBarang === true && j.adaBarang !== true;
+    if (F.mode === 'barang') {
+      S.barang = F.url;
+      S.terakhir = 'barang';
+      if (Number(j.nHalaman) > 0) S.nHalaman = Math.max(S.nHalaman, Number(j.nHalaman));
+      simpanSesi(Object.assign({}, S.p, {m: 'barang', set: S.idSet, hal: ''}));
+    } else {
+      const hal = Number(j.halaman) || (F.mode === 'ganti' ? F.hal : S.halaman.length + 1);
+      const i = S.halaman.findIndex(x => x.hal === hal);
+      if (i >= 0) S.halaman[i] = {hal, url: F.url}; else S.halaman.push({hal, url: F.url});
+      S.halaman.sort((a, b) => a.hal - b.hal);
+      S.nHalaman = Math.max(Number(j.nHalaman) || 0, hal, S.halaman.length);
+      S.halTerakhir = hal;
+      S.terakhir = 'nota';
+      /* muat ulang sesudah ini melanjutkan nota yang sama sebagai halaman tambahan, bukan nota baru */
+      simpanSesi(Object.assign({}, S.p, {m: 'tambah', set: S.idSet, hal: ''}));
+    }
     gambarKecil();
-    langkah(2, 'beres', tujuan());
-    langkah(3, 'beres');
-    hasilKotak('ok', (F.mode === 'ganti' ? 'Terkirim sebagai foto ulang.' : 'Terkirim.') + ' Foto tidak tersimpan di galeri HP.');
+    langkah(2, 'beres', '');
+    /* nota yang masih menunggu foto barang wajib belum selesai di laporan: langkah 3 tidak dicentang hijau */
+    langkah(3, F.mode !== 'barang' && perluBarang ? '' : 'beres');
+    if (F.mode === 'barang') hasilKotak('ok', 'Foto barang terkirim.');
+    else if (perluBarang) hasilKotak('ok', 'Terkirim. Sekarang foto barangnya.');
+    else hasilKotak('ok', (F.mode === 'ganti' ? 'Terkirim sebagai foto ulang.' : 'Terkirim.') + ' Foto tidak tersimpan di galeri HP.');
     const penuh = S.nHalaman >= HAL_MAKS;
+    $('t-barang').hidden = F.mode === 'barang' || !perluBarang;
+    $('t-selesai').hidden = !$('t-barang').hidden;
+    $('t-tambah').hidden = F.mode === 'barang';
     $('t-tambah').disabled = penuh;
-    $('t-batas').hidden = !penuh;
+    $('t-batas').hidden = !penuh || F.mode === 'barang';
+    $('t-ganti').textContent = F.mode === 'barang' ? 'Foto ulang barang' : 'Foto ulang';
+    $('aksi-ok').querySelector('.dua').classList.toggle('satu', F.mode === 'barang');
     aksi('ok');
     $('t-kembali').hidden = false;
   }
@@ -451,6 +507,22 @@
     setTimeout(() => layarPesan(S.terkirim ? 'Selesai' : 'Foto nota', 'Kembali ke tab Portal untuk melanjutkan. Halaman ini boleh ditutup.', false), 300);
   }
 
+  /* ---------- periksa token foto begitu halaman dibuka (BUILD v405 § 4.1, § 6) ----------
+     Berbarengan dengan menyalakan kamera, sekali, tanpa ulang. Hanya jawaban token/sesi/akses/lihat yang dipakai,
+     dan hanya selama belum ada foto yang sedang/sudah dikirim — kiriman itu melaporkan hasilnya sendiri. */
+  async function periksaToken() {
+    const nomor = ++S.nomorPeriksa, p = S.p;
+    let j = null;
+    try { j = await kirimSekali(JSON.stringify({jenis: 'nota-token', t: p.t, idOutlet: p.o}), BATAS_PERIKSA); } catch (e) { return; }
+    if (nomor !== S.nomorPeriksa || S.p !== p) return;
+    if (!j || j.ok !== false || !KODE_PERIKSA.has(String(j.kode || ''))) return;
+    if (S.sibuk || S.foto || S.terkirim || (S.layar !== 'kamera' && S.layar !== 'tolak')) return;
+    const kb = KABAR[j.kode] || KABAR.token;
+    matikanKamera();
+    tutupPopup(false);
+    layarPesan(kb[0], kb[1], true);
+  }
+
   /* ---------- mulai ---------- */
   function mulai() {
     let p = null;
@@ -461,7 +533,7 @@
     } else {
       p = bacaSesi();
     }
-    if (!p) return layarPesan('Buka dari Portal', 'Halaman ini dibuka dari Portal Asia Group: menu Foto nota, lalu ketuk fakturnya.', true);
+    if (!p) return layarPesan('Buka dari Portal', 'Halaman ini dibuka dari Portal Asia Group: menu Foto nota, lalu pilih notanya.', true);
     S.p = p;
     S.mode = p.m;
     S.idSet = p.m === 'baru' ? idAcak() : p.set;
@@ -471,10 +543,13 @@
     S.halTerakhir = 0;
     S.terkirim = false;
     S.foto = null;
+    S.barang = '';
+    S.terakhir = '';
     let b = 'nota';
     try { b = localStorage.getItem(KUNCI_BENTUK) || 'nota'; } catch (e) { b = 'nota'; }
-    pilihBentuk(b, false);
+    S.bentuk = BENTUK[b] ? b : 'nota';
     bukaKamera();
+    periksaToken();
   }
   function muatHuruf() {
     const l = document.createElement('link');
@@ -515,8 +590,14 @@
     bukaKamera();
   });
   $('t-ganti').addEventListener('click', () => {
+    if (S.terakhir === 'barang') { S.mode = 'barang'; S.hal = 0; bukaKamera(); return; }
     S.mode = 'ganti';
     S.hal = S.halTerakhir || 1;
+    bukaKamera();
+  });
+  $('t-barang').addEventListener('click', () => {
+    S.mode = 'barang';
+    S.hal = 0;
     bukaKamera();
   });
   $('t-kirim-ulang').addEventListener('click', kirim);
