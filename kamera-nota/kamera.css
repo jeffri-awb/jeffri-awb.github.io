@@ -1,5 +1,5 @@
-/* Kamera nota v4. Warna dan ukuran mengikuti DESIGN.md "Biru Keputusan"; layar bidik gelap seperti v3.
-   Kontrak: foto-nota-v406-2026-10-16/BUILD.md § 2–§ 4. */
+/* Kamera nota v5. Warna dan ukuran mengikuti DESIGN.md "Biru Keputusan"; layar bidik gelap seperti v3.
+   Kontrak: foto-nota-v406-2026-10-16/BUILD.md § 2–§ 4; v5: masukan-uji-v412-2026-10-20/BUILD.md § 4. */
 :root{
   --primary:#2563eb;--primary-hover:#1d4ed8;--ink:#102a56;--muted:#475569;--line:#dce5f0;--control:#b6c5d8;
   --soft:#eff6ff;--bg:#f5f8fc;--surface:#fff;--subtle:#f8faff;--halo:#dbeafe;--neutral-soft:#f1f5f9;
@@ -141,17 +141,30 @@ svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-lin
 .kam-x:focus-visible,.kam-rana:focus-visible,.kam-alat:focus-visible,.kam-alat:focus-within{outline-color:#fff}
 .kam-bidik{grid-area:bidik;position:relative;min-height:0;overflow:hidden;background:#111}
 .kam-bidik video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-/* Bingkai landscape 3:2 (BUILD v406 § 3); ukuran dan letaknya dihitung kamera.js (letakKotak). */
+/* Bingkai landscape 3:2 (BUILD v406 § 3) atau tegak 3:4 (v5, BUILD v412 § 4); ukuran dan letaknya dihitung
+   kamera.js (letakKotak). */
 .kotak-bidik{position:absolute;border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.55);outline:1.5px solid rgba(255,255,255,.6);pointer-events:none}
 .kotak-bidik .s{position:absolute;width:30px;height:30px;border:4px solid #fff}
 .kotak-bidik .tl{left:-4px;top:-4px;border-right:0;border-bottom:0;border-top-left-radius:12px}
 .kotak-bidik .tr{right:-4px;top:-4px;border-left:0;border-bottom:0;border-top-right-radius:12px}
 .kotak-bidik .bl{left:-4px;bottom:-4px;border-right:0;border-top:0;border-bottom-left-radius:12px}
 .kotak-bidik .br{right:-4px;bottom:-4px;border-left:0;border-top:0;border-bottom-right-radius:12px}
-.kam-petunjuk{position:absolute;left:12px;right:12px;margin:0;text-align:center;font-size:15px;font-weight:700;line-height:1.3;
+/* Petunjuk + pilihan bentuk nota (v5) di bawah bingkai. Lebar HP tegak tidak muat sebaris, jadi pilihan turun ke bawah
+   petunjuk; HP diputar mendatar: sebaris supaya tidak keluar bidang. Letak atasnya dihitung kamera.js. */
+.kam-panduan{position:absolute;left:12px;right:12px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
+  gap:8px 14px;pointer-events:none}
+.kam-petunjuk{margin:0;text-align:center;font-size:15px;font-weight:700;line-height:1.3;
   text-shadow:0 1px 3px rgba(0,0,0,.85);pointer-events:none}
+/* Tombol bersegmen Mendatar | Tegak: latar gelap pekat supaya terbaca di atas kertas putih sekalipun; yang dipilih putih. */
+.kam-bingkai{display:inline-flex;gap:2px;padding:3px;border-radius:13px;background:rgba(0,0,0,.66);border:1px solid rgba(255,255,255,.4);
+  pointer-events:auto}
+.kam-bingkai button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;min-height:44px;padding:0 14px;
+  border:0;border-radius:10px;background:none;color:#fff;font-size:15px;font-weight:700;line-height:1.2;white-space:nowrap}
+.kam-bingkai button svg{width:20px;height:20px;flex:none}
+.kam-bingkai button[aria-pressed="true"]{background:#fff;color:var(--ink)}
+.kam-bingkai button:focus-visible{outline-color:#fff;outline-offset:2px}
 .kam.barang .kotak-bidik{display:none}
-.kam.barang .kam-petunjuk{top:auto!important;bottom:14px}
+.kam.barang .kam-panduan{top:auto!important;bottom:14px}
 .kam-ket{position:absolute;inset:0;margin:0;display:grid;place-items:center;font-size:15px;font-weight:600;color:#e2e8f0;
   text-shadow:0 1px 3px rgba(0,0,0,.85);pointer-events:none}
 .kam-ket:empty{display:none}

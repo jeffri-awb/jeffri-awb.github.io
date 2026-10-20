@@ -10,7 +10,7 @@
 <title>Foto nota · Portal Asia Group</title>
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="kamera.css?v=4">
+<link rel="stylesheet" href="kamera.css?v=5">
 </head>
 <body>
 <svg class="ikon-sumber" aria-hidden="true" focusable="false">
@@ -20,6 +20,8 @@
   <symbol id="i-petir" viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/></symbol>
   <symbol id="i-petir-mati" viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/><path d="M3 3l18 18"/></symbol>
   <symbol id="i-hp" viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+  <symbol id="i-mendatar" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1.5"/></symbol>
+  <symbol id="i-tegak" viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="1.5"/></symbol>
 </svg>
 <main class="app">
 
@@ -56,7 +58,13 @@
   <div class="kam-bidik" id="kam-bidik">
     <video id="kam-video" playsinline muted autoplay></video>
     <div class="kotak-bidik" id="kotak-bidik" aria-hidden="true"><i class="s tl"></i><i class="s tr"></i><i class="s bl"></i><i class="s br"></i></div>
-    <p class="kam-petunjuk" id="kam-petunjuk"></p>
+    <div class="kam-panduan" id="kam-panduan">
+      <p class="kam-petunjuk" id="kam-petunjuk"></p>
+      <div class="kam-bingkai" id="kam-bingkai" role="group" aria-label="Bentuk nota" hidden>
+        <button type="button" id="bingkai-mendatar" aria-pressed="true"><svg aria-hidden="true"><use href="#i-mendatar"/></svg>Mendatar</button>
+        <button type="button" id="bingkai-tegak" aria-pressed="false"><svg aria-hidden="true"><use href="#i-tegak"/></svg>Tegak</button>
+      </div>
+    </div>
     <p class="kam-ket" id="kam-ket" role="status" aria-live="polite">Menyalakan kamera…</p>
   </div>
   <div class="kam-bawah">
@@ -139,6 +147,6 @@
 </div>
 
 </main>
-<script src="kamera.js?v=4"></script>
+<script src="kamera.js?v=5"></script>
 </body>
 </html>

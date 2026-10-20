@@ -1,6 +1,7 @@
 'use strict';
-/* Kamera nota v4 — Portal Asia Group · Supply Chain (kontrak: laporan-scm-finance-2026-10-14/BUILD.md § 5,
-   foto-nota-v405-2026-10-16/BUILD.md § 6, foto-nota-v406-2026-10-16/BUILD.md § 2–§ 5).
+/* Kamera nota v5 — Portal Asia Group · Supply Chain (kontrak: laporan-scm-finance-2026-10-14/BUILD.md § 5,
+   foto-nota-v405-2026-10-16/BUILD.md § 6, foto-nota-v406-2026-10-16/BUILD.md § 2–§ 5,
+   masukan-uji-v412-2026-10-20/BUILD.md § 4: pilihan bingkai Mendatar | Tegak).
    Dibuka Portal (menu Foto nota) di tab baru, di LAYAR NOTA: dua kotak (Foto nota, Foto barang). Kotak kosong =
    tombol kamera; kotak terisi = gambar kecil + Hapus. Kamera menyala di halaman yang sama (tanpa muat ulang), jadi
    izin kamera HP cukup ditanya sekali selama tab ini terbuka.
@@ -22,14 +23,23 @@
      Alasan ukuran: kamera utama HP dalam posisi tegak melihat ±50–60° mendatar. Nota selebar 21 cm yang memenuhi 80%
      lebar layar terpotret dari ±23–30 cm — cukup jauh untuk tetap fokus (kamera utama iPhone Pro fokus mulai ±20 cm),
      cukup dekat supaya tulisan terbaca. Bingkai tegak v3 lebarnya hanya ±65%, sehingga nota landscape kecil di foto
-     dan admin memotret dari jauh (buram). */
-  const RASIO = 3 / 2, LEBAR_BINGKAI = 0.8, TINGGI_BINGKAI_MAKS = 0.7, NAIK_BINGKAI = 0.04;
+     dan admin memotret dari jauh (buram).
+     v5 (BUILD v412 § 4): nota tegak yang dipaksa masuk bingkai mendatar jadi miring, maka admin memilih bentuknya di
+     layar kamera. Mendatar = bawaan, persis v4. Tegak = 3:4 (lebar:tinggi), lebar paling banyak 80%, tinggi paling
+     banyak 72%. Keduanya dinaikkan sedikit dari tengah. Pilihan diingat per HP (localStorage), hanya 'tegak' yang
+     dikenal; nilai lain atau gagal baca = Mendatar. */
+  const BINGKAI = {
+    mendatar: {rasio: 3 / 2, tinggiMaks: 0.7, petunjuk: 'Masukkan nota mendatar ke dalam bingkai'},
+    tegak: {rasio: 3 / 4, tinggiMaks: 0.72, petunjuk: 'Masukkan nota tegak ke dalam bingkai'}
+  };
+  const LEBAR_BINGKAI = 0.8, NAIK_BINGKAI = 0.04;
   const SISI_MAKS = 1600, BITA_MAKS = 330 * 1024, HAL_MAKS = 6;
   const JEDA_ULANG = UJI.jeda || [1000, 3000, 7000];
   const BATAS_TUNGGU = UJI.batas || 25000;
   const BATAS_PERIKSA = UJI.batasPeriksa || 15000;
   const JEDA_LANGKAH3 = 300, JEDA_KEMBALI = UJI.kembali || 1200;
   const KUNCI_SESI = 'kamera-nota-v4', KUNCI_SESI_V3 = 'kamera-nota-v2', KUNCI_FLASH = 'kamera-nota-flash';
+  const KUNCI_BINGKAI = 'kamera-nota-bingkai';
   const KODE_ULANG = new Set(['sibuk', 'belum-pasti', 'gagal']);
   /* Pemeriksaan awal hanya bertindak atas jawaban yang pasti berarti "kiriman nanti akan ditolak". Jawaban lain
      (Portal v403 yang belum mengenal pemeriksaan ini, sibuk, gagal, sinyal putus) didiamkan: unggah tetap memeriksa. */
@@ -64,7 +74,7 @@
     p: null,                       // fragmen yang sudah diperiksa (v=2 atau v=3)
     set: '', status: '', nota: [], barang: '', notaLama: false, kk: '', baru: {nota: false, barang: false},
     gambar: {},                    // idFoto → {st: 'muat'|'ok'|'gagal', url}; tidak pernah disimpan ke sessionStorage
-    apa: 'nota', stream: null, nomorKamera: 0, layar: '', flash: true, bisaFlash: false,
+    apa: 'nota', stream: null, nomorKamera: 0, layar: '', flash: true, bisaFlash: false, bingkai: 'mendatar',
     foto: null, sibuk: false, terkirim: false, berubah: false, nomorPeriksa: 0, nomorKirim: 0, jamKembali: 0,
     hapus: {nota: null, barang: null}, sibukHapus: ''
   };
@@ -449,18 +459,34 @@
 
   /* ---------- kamera ---------- */
   function letakKotak() {
-    const b = $('kam-bidik'), k = $('kotak-bidik'), pt = $('kam-petunjuk');
+    const b = $('kam-bidik'), k = $('kotak-bidik'), pd = $('kam-panduan');
     const W = b.clientWidth, H = b.clientHeight;
     if (!W || !H) return;
-    if (S.apa === 'barang') { pt.style.top = ''; return; }
-    let w = W * LEBAR_BINGKAI, h = w / RASIO;
-    if (h > H * TINGGI_BINGKAI_MAKS) { h = H * TINGGI_BINGKAI_MAKS; w = h * RASIO; }
+    if (S.apa === 'barang') { pd.style.top = ''; return; }
+    const bk = BINGKAI[S.bingkai] || BINGKAI.mendatar;
+    let w = W * LEBAR_BINGKAI, h = w / bk.rasio;
+    if (h > H * bk.tinggiMaks) { h = H * bk.tinggiMaks; w = h * bk.rasio; }
     const top = Math.max(8, (H - h) / 2 - H * NAIK_BINGKAI);
     k.style.width = w + 'px';
     k.style.height = h + 'px';
     k.style.left = (W - w) / 2 + 'px';
     k.style.top = top + 'px';
-    pt.style.top = Math.min(top + h + 12, H - 28) + 'px';
+    /* petunjuk + pilihan Mendatar | Tegak di bawah bingkai: bertumpuk di HP tegak, sebaris di HP mendatar (flex-wrap) */
+    pd.style.top = Math.max(0, Math.min(top + h + 12, H - pd.offsetHeight - 8)) + 'px';
+  }
+  /* Pilihan bingkai (BUILD v412 § 4): hanya di kamera foto nota. Kamera HP dan foto barang tidak memakai bingkai. */
+  function tampilBingkai() {
+    $('kam-bingkai').hidden = S.apa === 'barang';
+    $('bingkai-mendatar').setAttribute('aria-pressed', String(S.bingkai === 'mendatar'));
+    $('bingkai-tegak').setAttribute('aria-pressed', String(S.bingkai === 'tegak'));
+    $('kam-petunjuk').textContent = S.apa === 'barang' ? 'Semua barang masuk layar' : BINGKAI[S.bingkai].petunjuk;
+  }
+  function pilihBingkai(nama) {
+    if (nama !== 'mendatar' && nama !== 'tegak') return;          // daftar putih: hanya dua bentuk
+    S.bingkai = nama;
+    try { localStorage.setItem(KUNCI_BINGKAI, nama); } catch (e) { /* hanya kenyamanan: pilihan tetap berlaku di tab ini */ }
+    tampilBingkai();
+    letakKotak();
   }
   function ket(t) { $('kam-ket').textContent = t; }
   function matikanKamera() {
@@ -491,7 +517,7 @@
     $('kamera').classList.toggle('barang', barang);
     $('kam-apa').textContent = NAMA[S.apa];
     $('kam-kertas').textContent = S.p.j || S.p.s || S.p.f;
-    $('kam-petunjuk').textContent = barang ? 'Semua barang masuk layar' : 'Tepi nota pas di garis kotak';
+    tampilBingkai();
     $('kam-flash').hidden = true;
     tampil('kamera');
     const nomor = S.nomorKamera, rana = $('kam-rana');
@@ -878,6 +904,7 @@
     S.apa = 'nota';
     try { localStorage.removeItem('kamera-nota-bentuk'); } catch (e) { /* simpanan pilihan Nota/Struk v3 dibuang */ }
     try { S.flash = localStorage.getItem(KUNCI_FLASH) !== '0'; } catch (e) { S.flash = true; }
+    try { S.bingkai = localStorage.getItem(KUNCI_BINGKAI) === 'tegak' ? 'tegak' : 'mendatar'; } catch (e) { S.bingkai = 'mendatar'; }
     simpanSesi();
     try { sessionStorage.removeItem(KUNCI_SESI_V3); } catch (e) { /* abaikan */ }
     isiKepala();
@@ -894,6 +921,8 @@
   $('kam-rana').addEventListener('click', jepret);
   $('kam-tutup').addEventListener('click', () => layarNota(true));
   $('kam-flash').addEventListener('click', tombolFlash);
+  $('bingkai-mendatar').addEventListener('click', () => pilihBingkai('mendatar'));
+  $('bingkai-tegak').addEventListener('click', () => pilihBingkai('tegak'));
   document.querySelectorAll('.pilih-foto').forEach(inp => {
     inp.addEventListener('click', () => { if (S.stream) matikanKamera(); });
     inp.addEventListener('change', () => {
@@ -934,6 +963,9 @@
   window.addEventListener('pagehide', matikanKamera);
   window.addEventListener('pageshow', e => { if (e.persisted && S.layar === 'kamera' && !S.stream) bukaKamera(S.apa); });
   window.addEventListener('resize', letakKotak);
+  /* HP diputar / bilah peramban muncul: ukuran bidang kamera bisa berubah sesudah `resize` (Safari iOS), jadi bingkai
+     dihitung ulang juga setiap kali bidangnya sendiri berubah ukuran. */
+  if (typeof ResizeObserver === 'function') new ResizeObserver(() => letakKotak()).observe($('kam-bidik'));
   window.addEventListener('beforeunload', e => { if (S.foto || S.sibuk || S.sibukHapus) { e.preventDefault(); e.returnValue = ''; } });
   window.addEventListener('hashchange', () => { if (location.hash.length > 1 && !S.sibuk && !S.foto && !S.sibukHapus) mulai(); });
 
