@@ -10,7 +10,7 @@
 <title>Foto nota · Portal Asia Group</title>
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="kamera.css?v=5">
+<link rel="stylesheet" href="kamera.css?v=6">
 </head>
 <body>
 <svg class="ikon-sumber" aria-hidden="true" focusable="false">
@@ -41,6 +41,13 @@
       <span class="k-oleh" id="k-oleh"></span>
       <span class="k-aksi" id="k-aksi"></span>
     </div>
+    <div class="kartu-portal" id="n-kartu" role="alert" hidden>
+      <b id="kartu-judul">Buka lagi dari Portal</b>
+      <p id="kartu-isi"></p>
+      <button type="button" class="btn" id="t-tutup3">Tutup halaman</button>
+      <button type="button" class="btn" id="t-muat-ulang" hidden>Muat ulang</button>
+    </div>
+    <div class="pita" id="n-pita" role="status" aria-live="polite" hidden></div>
     <div class="slot" id="slot-nota" data-apa="nota"></div>
     <div class="slot" id="slot-barang" data-apa="barang"></div>
   </div>
@@ -127,10 +134,20 @@
   </div>
 </section>
 
+<section id="tunggu" class="layar" aria-label="Menunggu foto terkirim" hidden>
+  <header class="atas">
+    <h1 class="judul" id="tunggu-judul">Menunggu foto terkirim…</h1>
+  </header>
+  <div class="isi">
+    <p class="hasil tunggu" id="tunggu-isi" role="status" aria-live="polite"></p>
+    <div class="aksi"><button type="button" class="btn" id="t-batal-tunggu">‹ Kembali ke nota</button></div>
+  </div>
+</section>
+
 <div class="pop" id="tanya" hidden>
   <div class="pop-kotak" role="alertdialog" aria-modal="true" aria-labelledby="tanya-judul" aria-describedby="tanya-isi">
     <h2 id="tanya-judul"></h2>
-    <p id="tanya-isi">Foto ini hilang dari Laporan harian. Anda bisa memotret lagi.</p>
+    <p id="tanya-isi"></p>
     <div class="pop-dua">
       <button type="button" class="btn" id="tanya-batal">Batal</button>
       <button type="button" class="btn bahaya" id="tanya-hapus">Hapus</button>
@@ -147,6 +164,6 @@
 </div>
 
 </main>
-<script src="kamera.js?v=5"></script>
+<script src="kamera.js?v=6"></script>
 </body>
 </html>
