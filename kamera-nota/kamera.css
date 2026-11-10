@@ -78,7 +78,6 @@ svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-lin
 .slot-hapus:hover{color:var(--danger-hover);background:var(--danger-soft)}
 .slot-gambar{position:relative;height:120px;border-radius:8px;background:#e9eef5;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .slot-gambar img{max-width:100%;max-height:120px;width:auto;height:auto;object-fit:contain;display:block}
-.slot-gambar .lencana{position:absolute;right:6px;bottom:6px;background:rgba(16,42,86,.82);color:#fff;font-size:12px;font-weight:700;border-radius:20px;padding:2px 8px}
 .slot-gambar .ada{font-size:14px;font-weight:600;color:var(--muted)}
 .slot-gambar.memuat{background:linear-gradient(90deg,#e9eef5 25%,#f6f8fb 37%,#e9eef5 63%);background-size:400% 100%;animation:kilau 1.4s ease infinite}
 .slot-ulang{border:0;background:none;color:var(--muted);font-size:14px;font-weight:600;min-height:44px;width:100%;height:100%}
@@ -93,6 +92,16 @@ svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-lin
 .pil-kirim.ok{color:var(--success);background:var(--success-soft)}
 .slot-isi .slot-pesan{margin:8px 0 0}
 .slot-aksi{display:flex;gap:8px;margin-top:8px}
+/* v7: Tambah lembar nota — tombol garis di bawah gambar nota, 44 px sentuh */
+.slot-isi .slot-tambah{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;margin-top:8px;font-size:15px}
+.slot-tambah svg{width:18px;height:18px;flex:none}
+/* v7: baris lembar nota (jelas berapa lembar yang sudah difoto) */
+.lembar-daftar{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.lembar-pil{display:inline-flex;align-items:center;gap:4px;min-height:30px;padding:4px 10px;border-radius:16px;font-size:14px;font-weight:700;border:1px solid var(--line);color:var(--ink);background:var(--surface)}
+.lembar-pil svg{width:16px;height:16px;flex:none}
+.lembar-pil.ok{border-color:var(--success);color:var(--success)}
+.lembar-pil.kirim{color:var(--muted)}
+.lembar-pil.gagal{border-color:var(--danger);color:var(--danger)}
 .slot-aksi .btn{min-height:44px;font-size:15px}
 .slot-aksi .btn.primer{min-height:44px}
 .pita{display:flex;flex-direction:column;gap:6px}

@@ -132,6 +132,7 @@
     antre: [],                     // salinan isi IndexedDB, urut dibuat
     url: new Map(), dataUrl: new Map(), hijau: {}, ganti: {nota: '', barang: ''},
     ragu: {nota: null, barang: null}, raguCalon: null, urut: 0, kedaluwarsa: 0, menungguTutup: false, jamKamera: 0,
+    tambah: false,                 // v7: kamera foto nota ini memotret LEMBAR TAMBAHAN (mode tambah, set nota sekarang)
     lepas: new Set()               // G6-K-01: id foto ditolak yang sudah diganti foto baru di Portal; tidak tampil lagi di halaman ini
   };
 
@@ -275,11 +276,18 @@
   function bolehHapus(apa) {
     if (S.p.v !== '3' || cocok()) return false;
     const a = akhirSlot(apa);
-    if (a) return a.jenis === 'foto' && a.status === 'antre';
+    if (a) return a.jenis === 'foto' && a.status === 'antre' && a.mode !== 'tambah';   // v7: lembar tambahan tidak dihapus sendiri
     return apa === 'nota' ? S.nota.length > 0 : adaBarang();
   }
   /* Alamat v=2 (Portal v405): server v405 menolak foto barang sebelum ada foto nota. */
   const tungguNota = apa => apa === 'barang' && S.p.v === '2' && !adaNota();
+  /* v7 (10 Nov 2026, Jeffri: nota 2 lembar, mis. faktur + jaminan embalasi cukai): Tambah lembar = mode 'tambah' di set nota
+     sekarang, sampai HAL_MAKS lembar. Hanya bila nota di Portal sudah ada dan tenang (tidak ada foto/hapus nota yang masih
+     di HP untuk faktur ini), bukan cocok dan bukan ditolak (Portal hanya menerima set baru / foto barang saat ditolak). */
+  function bisaTambah() {
+    return S.p.v === '3' && !cocok() && S.status !== 'ditolak' && S.nota.length >= 1 && S.nota.length < HAL_MAKS
+      && !!S.set && !urutanSlot('nota').length && !S.sibukHapus && !S.tokenMati && !DB.rusak;
+  }
 
   /* Kotak keadaan sesudah jawaban Portal (BUILD v406 § 2 + § 6.4): tolakan/permintaan berakhir begitu kotak targetnya
      diisi foto baru; status `sudah` dengan dua kotak terisi = "Menunggu dicek Purchasing."; cocok tidak berubah. */
@@ -470,7 +478,7 @@
       && (x.apa === 'nota' || x.apa === 'barang') && typeof x.idOutlet === 'string' && typeof x.faktur === 'string'
       && typeof x.idSet === 'string' && (x.idSet === '' || HEX24.test(x.idSet)) && (x.status === 'antre' || x.status === 'gagal')
       && typeof x.tab === 'string' && typeof x.pemilik === 'string' && isFinite(Number(x.dibuat))
-      && (x.jenis === 'hapus' || ((x.mode === 'baru' || x.mode === 'barang') && !!x.blob));
+      && (x.jenis === 'hapus' || ((x.mode === 'baru' || x.mode === 'tambah' || x.mode === 'barang') && !!x.blob));
   }
   async function muatAntrean() {
     if (!idbAda()) return S.antre;
@@ -614,10 +622,11 @@
       const lokTampil = lok || sebelum;
       let pil = null;              // pil kirim di pojok gambar, supaya kepala kotak tetap satu baris di HP 360 px
       if (gagalLok) {
-        kepala.append(el('b', '', NAMA[apa]), el('span', 'pil-tolak', 'Belum tersimpan'));
+        kepala.append(el('b', '', lok.mode === 'tambah' ? NAMA[apa] + ' · lembar ' + (S.nota.length + 1) : NAMA[apa]),
+          el('span', 'pil-tolak', 'Belum tersimpan'));
       } else if (lokTampil) {
         /* foto di HP yang belum dijawab Portal: TANPA centang hijau; pil abu "Mengirim…" */
-        kepala.append(el('b', '', NAMA[apa]));
+        kepala.append(el('b', '', lokTampil.mode === 'tambah' ? NAMA[apa] + ' · lembar ' + (S.nota.length + 1) : NAMA[apa]));
         if (!menghapus) {
           const lemah = navigator.onLine === false || (lokTampil.sebab === 'jaringan' && Number(lokTampil.percobaan) >= 2);
           /* kartu (token mati / rusak) atau pita (memori HP penuh, G3-K3-01) di atas menjelaskan */
@@ -627,7 +636,7 @@
       } else {
         /* foto yang ditolak: label merah "Ditolak" TANPA centang hijau (BUILD v405 permintaan 2) */
         if (!ditolak) { const cek = el('span', 'cek'); cek.append(ikon('cek')); kepala.append(cek); }
-        kepala.append(el('b', '', NAMA[apa]));
+        kepala.append(el('b', '', apa === 'nota' && S.nota.length > 1 ? NAMA.nota + ' · ' + S.nota.length + ' lembar' : NAMA[apa]));
         if (ditolak) kepala.append(el('span', 'pil-tolak', 'Ditolak'));
         const idT = apa === 'nota' ? (S.nota[0] && S.nota[0].idFoto) : S.barang;
         if (idT && S.hijau[idT] && !menghapus) pil = el('span', 'pil-kirim ok', 'Terkirim');   // hanya dari jawaban ok Portal
@@ -645,6 +654,7 @@
       const gb = lokTampil ? gambarLokal(apa, lokTampil) : gambarKotak(apa);
       if (pil) gb.append(pil);
       kotakIsi.append(kepala, gb);
+      if (apa === 'nota') { const dl = daftarLembar(lokTampil); if (dl) kotakIsi.append(dl); }
       if (gagalLok) {
         const ps = el('p', 'slot-pesan', lok.pesan || KABAR.gagal[1]);
         ps.setAttribute('role', 'alert');
@@ -654,6 +664,12 @@
         ak.append(tombol(biru ? 'btn primer' : 'btn', 'ulang-' + apa, 'Foto ulang', () => fotoUlangGagal(apa, lok.idFoto)),
           tombol('btn', 'buang-' + apa, 'Buang', () => tanyaBuang(apa, lok.idFoto)));
         kotakIsi.append(ps, ak);
+      }
+      if (apa === 'nota' && !lokTampil && !gagalLok && !menghapus && bisaTambah()) {
+        const tb = tombol('btn slot-tambah', 'tambah-nota', 'Tambah lembar nota', () => mintaTambah());
+        tb.prepend(ikon('kamera'));
+        tb.setAttribute('aria-label', 'Tambah lembar nota ke-' + (S.nota.length + 1));
+        kotakIsi.append(tb);
       }
       anak.push(kotakIsi);
       if (menghapus) anak.push(el('div', 'slot-sibuk', 'Menghapus…'));
@@ -697,8 +713,21 @@
       g.setAttribute('role', 'img');
       g.setAttribute('aria-label', 'Memuat ' + NAMA[apa].toLowerCase());
     }
-    if (apa === 'nota' && S.nota.length > 1) g.append(el('span', 'lencana', '+' + (S.nota.length - 1) + ' hal.'));
     return g;
+  }
+  /* v7 (Jeffri 10 Nov: "perlu dikasih tau kalau dia sudah foto 2x"): baris lembar di bawah gambar nota, satu pil per
+     lembar yang sudah di Portal (centang hijau) + lembar tambahan yang masih di HP (abu "mengirim" / merah "belum
+     tersimpan"). Hanya bila lebih dari satu lembar; gambar kotak tetap lembar 1. */
+  function daftarLembar(lok) {
+    const ada = S.nota.length, tunda = lok && lok.mode === 'tambah' ? lok : null;
+    const n = ada + (tunda ? 1 : 0);
+    if (n < 2 || lok && !tunda) return null;
+    const d = el('div', 'lembar-daftar');
+    d.dataset.n = String(ada);
+    d.setAttribute('aria-label', ada + ' lembar nota sudah masuk Portal' + (tunda ? ', lembar ' + n + ' ' + (tunda.status === 'gagal' ? 'belum tersimpan' : 'sedang dikirim') : ''));
+    for (let i = 1; i <= ada; i++) { const p = el('span', 'lembar-pil ok'); p.append(ikon('cek'), document.createTextNode('Lembar ' + i)); d.append(p); }
+    if (tunda) d.append(el('span', 'lembar-pil ' + (tunda.status === 'gagal' ? 'gagal' : 'kirim'), 'Lembar ' + n));
+    return d;
   }
   /* Pita di atas kotak (rancangan A5): foto faktur lain yang ikut terkirim dari halaman ini, foto tertinggal, dan
      kartu "Buka lagi dari Portal" bila halaman ini tidak bisa mengirim lagi. Hanya hitungan, tanpa gambar. */
@@ -829,7 +858,9 @@
     if (S.sibukHapus || !bolehHapus(apa)) return;
     tanyaApa = apa;
     tanyaBuangId = '';
-    bukaTanya(apa === 'nota' ? 'Hapus foto nota?' : 'Hapus foto barang?', 'Foto ini hilang dari Laporan harian. Anda bisa memotret lagi.', 'Hapus');
+    const semua = apa === 'nota' && S.nota.length > 1 && !akhirSlot('nota');   // v7: Hapus nota = semua lembarnya
+    bukaTanya(apa === 'nota' ? (semua ? 'Hapus ' + S.nota.length + ' lembar foto nota?' : 'Hapus foto nota?') : 'Hapus foto barang?',
+      semua ? 'Semua lembar hilang dari Laporan harian. Anda bisa memotret lagi.' : 'Foto ini hilang dari Laporan harian. Anda bisa memotret lagi.', 'Hapus');
   }
   /* v6: foto yang ditolak Portal tidak dibuang otomatis. Buang = pilihan admin, dengan tanya. */
   function tanyaBuang(apa, id) {
@@ -920,12 +951,22 @@
     }
     if (perluMuatUlang()) { S.apa = apa; return popup(KABAR_MUAT, muatUlang); }   // v6 K3
     S.ganti[apa] = '';
+    S.tambah = false;
     return bukaKamera(apa);
+  }
+  /* v7: Tambah lembar nota — kamera foto nota yang sama, kirimannya mode 'tambah' di set nota sekarang. */
+  function mintaTambah() {
+    if (!bisaTambah()) return gambarNota();
+    if (sisaToken() < SISA_TOKEN_MIN) { S.apa = 'nota'; return popup(KABAR_HAMPIR, tutupAman); }
+    if (perluMuatUlang()) { S.apa = 'nota'; return popup(KABAR_MUAT, muatUlang); }
+    S.ganti.nota = '';
+    S.tambah = true;
+    return bukaKamera('nota');
   }
   function siapkanLayarKamera() {
     const barang = S.apa === 'barang';
     $('kamera').classList.toggle('barang', barang);
-    $('kam-apa').textContent = NAMA[S.apa];
+    $('kam-apa').textContent = S.apa === 'nota' && S.tambah ? NAMA.nota + ' · lembar ' + (S.nota.length + 1) : NAMA[S.apa];
     $('kam-kertas').textContent = S.p.j || S.p.s || S.p.f;
     tampilBingkai();
   }
@@ -1116,9 +1157,11 @@
     try { hasil = await jadikanJpeg(c); } catch (e) { hasil = null; }
     c.width = c.height = 0;
     if (!hasil) return gagalFoto();
-    const x = {idFoto: idAcak(), jenis: 'foto', apa, mode: apa === 'nota' ? 'baru' : 'barang',
-      /* foto nota selalu set baru; foto barang memakai set nota sekarang (termasuk nota yang masih antre) */
-      idSet: apa === 'nota' ? idAcak() : setSekarang() || idAcak(),
+    const tambah = apa === 'nota' && S.tambah && !!S.set;
+    const x = {idFoto: idAcak(), jenis: 'foto', apa, mode: apa === 'nota' ? (tambah ? 'tambah' : 'baru') : 'barang',
+      /* foto nota selalu set baru (v7: lembar tambahan = set nota Portal); foto barang memakai set nota sekarang
+         (termasuk nota yang masih antre) */
+      idSet: apa === 'nota' ? (tambah ? S.set : idAcak()) : setSekarang() || idAcak(),
       idOutlet: S.p.o, faktur: S.p.f, tanggal: S.p.tgl, w: hasil.w, h: hasil.h, sumber, blob: hasil.blob,
       dibuat: Date.now(), urut: ++S.urut, pemilik: S.pemilik || '', tab: S.tab, status: 'antre', percobaan: 0, lagiPada: 0,
       sebab: '', kode: '', pesan: ''};
@@ -1179,8 +1222,8 @@
     try { url = await blobKeDataUrl(hasil.blob); } catch (e) { return gagalFoto(); }
     S.foto = {url, w: hasil.w, h: hasil.h, idFoto: idAcak(), sumber, apa,
       /* foto nota selalu set baru; foto barang memakai set nota sekarang bila ada (BUILD v406 § 2) */
-      mode: apa === 'nota' ? 'baru' : 'barang',
-      idSet: apa === 'nota' ? idAcak() : setNotaAntre() || ((S.nota.length || S.notaLama) && S.set ? S.set : idAcak()),
+      mode: apa === 'nota' ? (S.tambah && S.set ? 'tambah' : 'baru') : 'barang',
+      idSet: apa === 'nota' ? (S.tambah && S.set ? S.set : idAcak()) : setNotaAntre() || ((S.nota.length || S.notaLama) && S.set ? S.set : idAcak()),
       /* G6-K-01: Foto ulang foto yang ditolak (memori HP penuh / tanpa IndexedDB) → foto lama dibuang sesudah ok Portal */
       ganti: S.ganti[apa] || ''};
     $('kirim-img').alt = NAMA[apa] + ' ' + S.p.f;
@@ -1473,6 +1516,8 @@
     if (sisaToken() < SISA_TOKEN_MIN) { S.apa = apa; return popup(KABAR_HAMPIR, tutupAman); }
     if (perluMuatUlang()) { S.apa = apa; return popup(KABAR_MUAT, muatUlang); }   // v6 K3
     S.ganti[apa] = id;
+    const lama = S.antre.find(y => y.idFoto === id);
+    S.tambah = apa === 'nota' && !!lama && lama.mode === 'tambah';   // v7: Foto ulang lembar tambahan tetap lembar tambahan
     bukaKamera(apa);
   }
   /* G6-K-01 (tinjau ulang gelombang 6): foto baru yang tidak bisa disimpan di HP (memori penuh) dikirim lewat jalur v5,
