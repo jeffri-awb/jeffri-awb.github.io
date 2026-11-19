@@ -10,7 +10,7 @@
 <title>Foto nota · Portal Asia Group</title>
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com">
-<link rel="stylesheet" href="kamera.css?v=7">
+<link rel="stylesheet" href="kamera.css?v=8">
 </head>
 <body>
 <svg class="ikon-sumber" aria-hidden="true" focusable="false">
@@ -22,6 +22,7 @@
   <symbol id="i-hp" viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10.5 18.5h3"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
   <symbol id="i-mendatar" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1.5"/></symbol>
   <symbol id="i-tegak" viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="1.5"/></symbol>
+  <symbol id="i-putar" viewBox="0 0 24 24"><path d="M21 4v6h-6"/><path d="M3 20v-6h6"/><path d="M5.1 9a8 8 0 0113.4-2.6L21 10M3 14l2.5 3.6A8 8 0 0018.9 15"/></symbol>
 </svg>
 <main class="app">
 
@@ -61,6 +62,7 @@
   <header class="kam-atas">
     <button type="button" class="kam-x" id="kam-tutup" aria-label="Tutup kamera, kembali ke nota">✕</button>
     <div class="kam-judul"><b id="kam-apa"></b><span id="kam-kertas"></span></div>
+    <button type="button" class="kam-putar" id="kam-putar" aria-label="Putar ke kamera depan" hidden><svg aria-hidden="true"><use href="#i-putar"/></svg><span>Putar</span></button>
   </header>
   <div class="kam-bidik" id="kam-bidik">
     <video id="kam-video" playsinline muted autoplay></video>
@@ -164,6 +166,6 @@
 </div>
 
 </main>
-<script src="kamera.js?v=7"></script>
+<script src="kamera.js?v=8"></script>
 </body>
 </html>

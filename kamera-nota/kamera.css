@@ -1,4 +1,4 @@
-/* Kamera nota v6. Warna dan ukuran mengikuti DESIGN.md "Biru Keputusan"; layar bidik gelap seperti v3.
+/* Kamera nota v8 (v6 + tombol Putar). Warna dan ukuran mengikuti DESIGN.md "Biru Keputusan"; layar bidik gelap seperti v3.
    Kontrak: foto-nota-v406-2026-10-16/BUILD.md § 2–§ 4; v5: masukan-uji-v412-2026-10-20/BUILD.md § 4;
    v6: audit-laporan-v413-2026-10-20/BUILD.md § 5 (pil kirim, pita, kartu buka lagi, layar tunggu). */
 :root{
@@ -164,6 +164,13 @@ svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-lin
 .kam-judul span:empty{display:none}
 .kam-x{width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:18px;flex:none;display:grid;place-items:center;padding:0}
 .kam-x:focus-visible,.kam-rana:focus-visible,.kam-alat:focus-visible,.kam-alat:focus-within{outline-color:#fff}
+/* v8: Putar (kamera belakang ↔ depan) di kanan kepala, bentuk pil seperti ✕ supaya tidak menggeser Flash dan Kamera HP di
+   bawah. Tampil hanya bila HP punya dua kamera (kamera.js tampilPutar). */
+.kam-putar{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:6px;min-width:44px;min-height:44px;padding:0 14px;
+  border:0;border-radius:22px;background:rgba(255,255,255,.14);color:#fff;font-size:14px;font-weight:700;line-height:1.2}
+.kam-putar svg{width:20px;height:20px;flex:none}
+.kam-putar:disabled{opacity:.5;cursor:default}
+.kam-putar:focus-visible{outline-color:#fff}
 .kam-bidik{grid-area:bidik;position:relative;min-height:0;overflow:hidden;background:#111}
 .kam-bidik video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 /* Bingkai landscape 3:2 (BUILD v406 § 3) atau tegak 3:4 (v5, BUILD v412 § 4); ukuran dan letaknya dihitung
@@ -193,6 +200,10 @@ svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-lin
 .kam-ket{position:absolute;inset:0;margin:0;display:grid;place-items:center;font-size:15px;font-weight:600;color:#e2e8f0;
   text-shadow:0 1px 3px rgba(0,0,0,.85);pointer-events:none}
 .kam-ket:empty{display:none}
+/* v8: kabar sesudah Putar (mis. "Kamera depan belum bisa dibuka.") tampil di atas video, jadi diberi pil gelap di bagian atas
+   bidang supaya terbaca di atas kertas putih dan tidak menutupi bingkai. */
+.kam-ket.kabar{inset:12px 12px auto;display:block;width:max-content;max-width:calc(100% - 24px);margin:0 auto;padding:10px 16px;
+  border-radius:12px;background:var(--ink);color:#fff;text-align:center;text-shadow:none}
 .kam-bawah{grid-area:bawah;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;background:#000;
   padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
 .kam-sisi{display:flex;justify-content:center}
@@ -210,6 +221,7 @@ svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-lin
   .kam{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr);grid-template-areas:"bidik atas" "bidik bawah"}
   .kam-atas{flex-direction:column;align-items:center;gap:4px;width:124px;padding:calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 4px 8px;text-align:center}
   .kam-judul{align-items:center;max-width:108px}
+  .kam-putar{margin-left:0}
   .kam-bawah{grid-template-columns:auto;grid-template-rows:1fr auto 1fr;width:124px;padding:4px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) 8px;gap:6px}
   .kam-sisi{align-items:center}
 }

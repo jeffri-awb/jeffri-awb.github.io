@@ -1,5 +1,5 @@
 'use strict';
-/* Kamera nota v6 — Portal Asia Group · Supply Chain (kontrak: laporan-scm-finance-2026-10-14/BUILD.md § 5,
+/* Kamera nota v8 (inti v6) — Portal Asia Group · Supply Chain (kontrak: laporan-scm-finance-2026-10-14/BUILD.md § 5,
    foto-nota-v405-2026-10-16/BUILD.md § 6, foto-nota-v406-2026-10-16/BUILD.md § 2–§ 5,
    masukan-uji-v412-2026-10-20/BUILD.md § 4: pilihan bingkai Mendatar | Tegak,
    audit-laporan-v413-2026-10-20/BUILD.md § 5: antrean latar, unggah terasa ≤ 2 dtk).
@@ -29,7 +29,14 @@
    - K3 (bantahan peninjau): koneksi IndexedDB yang putus di tengah halaman (Safari iOS) dibuka lagi dan pekerjaannya
      diulang sekali; tetap gagal → kartu "Belum terkirim. Muat ulang halaman ini." + tombol Muat ulang, putaran kirim
      berhenti, dan Hapus/Buang foto di HP tidak berpura-pura berhasil.
-   - K2 (bantahan peninjau): sisa waktu halaman dihitung dari `sampai` − `kini` jam Portal, bukan jam HP. */
+   - K2 (bantahan peninjau): sisa waktu halaman dihitung dari `sampai` − `kini` jam Portal, bukan jam HP.
+   v8 (19 Nov 2026, permintaan Jeffri: "bagusnya ada rotate camera depan dan belakang"): tombol Putar di kepala layar
+   kamera menukar kamera belakang ↔ depan (facingMode). Tampil hanya bila HP punya ≥ 2 kamera DAN kamera yang menyala
+   melaporkan arahnya (laptop yang tidak melaporkan arah = tanpa tombol). Setiap halaman dibuka mulai dari kamera
+   belakang; pilihan tidak disimpan di HP (kamera depan biasanya fokus tetap dan tanpa senter, jadi nota bisa buram).
+   Pilihan berlaku selama halaman terbuka: kotak berikutnya, tab tampil lagi, dan Foto ulang memakai kamera yang sama.
+   Kamera lain gagal menyala → kembali ke kamera sebelumnya dengan kalimat singkat, bukan layar "Kamera belum menyala".
+   Pratinjau TIDAK dicermin: tulisan nota terbaca sama dengan hasil foto. */
 (() => {
   const UJI = window.__ujiKameraNota || {};            // hanya diisi uji otomatis, untuk memperpendek jeda
   const $ = id => document.getElementById(id);
@@ -123,6 +130,10 @@
     set: '', status: '', nota: [], barang: '', notaLama: false, kk: '', baru: {nota: false, barang: false},
     gambar: {},                    // idFoto → {st: 'muat'|'ok'|'gagal', url}; tidak pernah disimpan ke sessionStorage
     apa: 'nota', stream: null, nomorKamera: 0, layar: '', flash: true, bisaFlash: false, bingkai: 'mendatar',
+    hadap: 'environment',          // v8: kamera yang diminta ('environment' belakang | 'user' depan); TIDAK disimpan di HP
+    bisaPutar: false,              // v8: HP ini punya ≥ 2 kamera dan arah kamera terbaca → tombol Putar tampil
+    putarDari: '', pesanPutar: '', jamPutar: 0,   // v8: arah sebelum Putar (kembali ke sana bila kamera lain gagal)
+    putarMati: false,              // v8: Putar terbukti tidak mengganti kamera di HP ini → tombol tetap disembunyikan
     foto: null, sibuk: false, terkirim: false, berubah: false, nomorPeriksa: 0, nomorKirim: 0, jamKembali: 0,
     hapus: {nota: null, barang: null}, sibukHapus: '',
     /* v6 */
@@ -910,7 +921,11 @@
     tampilBingkai();
     letakKotak();
   }
-  function ket(t) { $('kam-ket').textContent = t; }
+  function ket(t, kabar) {
+    const k = $('kam-ket');
+    k.textContent = t;
+    k.classList.toggle('kabar', !!(t && kabar));   // v8: kabar Putar = pil gelap di atas bidang, terbaca di atas kertas putih
+  }
   function matikanKamera() {
     clearTimeout(S.jamKamera);
     S.nomorKamera++;
@@ -933,13 +948,13 @@
   /* Resolusi (BUILD v406 § 3): minta 3264×2448 (4:3); HP yang tidak sanggup menolak dengan OverconstrainedError →
      coba lagi tanpa ukuran. */
   async function mintaKameraHP() {
-    const md = navigator.mediaDevices;
+    const md = navigator.mediaDevices, hadap = S.hadap === 'user' ? 'user' : 'environment';   // v8: arah pilihan admin
     try {
-      return await md.getUserMedia({audio: false, video: {facingMode: {ideal: 'environment'}, width: {ideal: 3264},
+      return await md.getUserMedia({audio: false, video: {facingMode: {ideal: hadap}, width: {ideal: 3264},
         height: {ideal: 2448}, aspectRatio: {ideal: 4 / 3}}});
     } catch (e) {
       if (!e || (e.name !== 'OverconstrainedError' && e.name !== 'ConstraintNotSatisfiedError')) throw e;
-      return md.getUserMedia({audio: false, video: {facingMode: {ideal: 'environment'}}});
+      return md.getUserMedia({audio: false, video: {facingMode: {ideal: hadap}}});
     }
   }
   /* Ketukan admin di kotak kosong / Foto ulang. v6 (unggah-foto-06): sisa waktu halaman < 10 menit → minta buka lagi
@@ -978,6 +993,7 @@
     matikanKamera();
     siapkanLayarKamera();
     $('kam-flash').hidden = true;
+    tampilPutar();
     tampil('kamera');
     const nomor = S.nomorKamera, rana = $('kam-rana');
     rana.disabled = true;
@@ -987,7 +1003,11 @@
     try {
       st = await mintaKameraHP();
     } catch (e) {
-      if (nomor === S.nomorKamera && S.layar === 'kamera') kameraGagal(e && e.name);
+      if (nomor !== S.nomorKamera || S.layar !== 'kamera') return;
+      /* v8: kamera lain (sesudah Putar) gagal menyala → kembali ke kamera sebelumnya, bukan layar gagal */
+      if (S.putarDari) { putarGagal(); return; }
+      S.pesanPutar = '';
+      kameraGagal(e && e.name);
       return;
     }
     if (nomor !== S.nomorKamera || S.layar !== 'kamera' || document.hidden) { st.getTracks().forEach(t => t.stop()); return; }
@@ -998,8 +1018,12 @@
     if (nomor !== S.nomorKamera) return;
     fokusTerus(st);
     pasangFlash(st, nomor);
-    ket('');
+    const dari = S.putarDari;
+    S.putarDari = '';
+    pasangPutar(st, nomor, dari);
+    ketPutar();
     rana.disabled = false;
+    tampilPutar();
   }
   /* v6: kamera yang masih hidup dari kotak sebelumnya dipakai lagi (tanpa getUserMedia). */
   function pakaiLagiKamera() {
@@ -1008,6 +1032,7 @@
     const tr = S.stream.getVideoTracks()[0], v = $('kam-video');
     $('kam-flash').hidden = !S.bisaFlash;
     if (S.bisaFlash) { tampilFlash(); if (S.flash) setelSenter(tr, true); }
+    tampilPutar();
     tampil('kamera');
     if (v.srcObject !== S.stream) v.srcObject = S.stream;
     try { const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); } catch (e) { /* tetap tampil */ }
@@ -1060,6 +1085,60 @@
     tampilFlash();
     const tr = S.stream && S.stream.getVideoTracks()[0];
     if (tr && S.bisaFlash) setelSenter(tr, S.flash);
+  }
+  /* v8: tombol Putar, kamera belakang ↔ depan. Arah dibaca dari getSettings().facingMode kamera yang benar-benar menyala
+     (HP yang tidak punya kamera depan memberi kamera belakang walau diminta depan). Tombol tampil hanya bila arahnya
+     terbaca dan peramban mencatat ≥ 2 kamera; laptop yang tidak melaporkan arah = tanpa tombol. Kamera depan umumnya
+     tanpa senter, jadi tombol Flash hilang di sana (pasangFlash) dan kembali saat Putar ke belakang. */
+  const NAMA_ARAH = {user: 'Kamera depan', environment: 'Kamera belakang'};
+  const arahLain = a => (a === 'user' ? 'environment' : 'user');
+  function arahKamera(tr) {
+    try { const a = tr && tr.getSettings ? tr.getSettings().facingMode : ''; return a === 'user' || a === 'environment' ? a : ''; } catch (e) { return ''; }
+  }
+  function pasangPutar(st, nomor, dari) {
+    const arah = arahKamera(st.getVideoTracks()[0]);
+    if (!arah) { S.bisaPutar = false; return tampilPutar(); }
+    if (dari && arah === dari) {                                       // diminta kamera lain, yang menyala tetap yang sama
+      S.pesanPutar = NAMA_ARAH[arahLain(dari)] + ' belum bisa dipakai di HP ini.';
+      S.bisaPutar = false;
+      S.putarMati = true;                                              // kotak berikutnya juga tanpa tombol
+    }
+    S.hadap = arah;
+    if (S.bisaPutar || (dari && arah === dari)) return tampilPutar();
+    const md = navigator.mediaDevices;
+    if (!md || typeof md.enumerateDevices !== 'function') return tampilPutar();
+    md.enumerateDevices().then(d => {
+      if (nomor !== S.nomorKamera || S.stream !== st) return;
+      S.bisaPutar = !S.putarMati && Array.isArray(d) && d.filter(x => x && x.kind === 'videoinput').length >= 2;
+      tampilPutar();
+    }, () => { /* tanpa daftar kamera = tanpa tombol */ });
+  }
+  function tampilPutar() {
+    const b = $('kam-putar');
+    b.hidden = !S.bisaPutar;
+    b.disabled = !S.stream || !!S.putarDari;
+    b.setAttribute('aria-label', 'Putar ke ' + NAMA_ARAH[arahLain(S.hadap)].toLowerCase());
+  }
+  function tombolPutar() {
+    if (!S.bisaPutar || !S.stream || S.putarDari || S.layar !== 'kamera') return;
+    S.putarDari = S.hadap;
+    S.hadap = arahLain(S.hadap);
+    matikanKamera();          // banyak HP tidak bisa menyalakan dua kamera sekaligus: matikan yang lama dulu
+    bukaKamera(S.apa);
+  }
+  function putarGagal() {
+    const gagal = S.hadap;
+    S.hadap = S.putarDari;
+    S.putarDari = '';
+    S.pesanPutar = NAMA_ARAH[gagal] + ' belum bisa dibuka.';
+    bukaKamera(S.apa);
+  }
+  function ketPutar() {
+    const t = S.pesanPutar;
+    S.pesanPutar = '';
+    clearTimeout(S.jamPutar);
+    ket(t, true);
+    if (t) S.jamPutar = setTimeout(() => { if ($('kam-ket').textContent === t) ket(''); }, UJI.pesanPutar || 2500);
   }
   function kameraGagal(nama) {
     matikanKamera();
@@ -1962,6 +2041,7 @@
   $('kam-rana').addEventListener('click', jepret);
   $('kam-tutup').addEventListener('click', () => layarNota(true));
   $('kam-flash').addEventListener('click', tombolFlash);
+  $('kam-putar').addEventListener('click', tombolPutar);
   $('bingkai-mendatar').addEventListener('click', () => pilihBingkai('mendatar'));
   $('bingkai-tegak').addEventListener('click', () => pilihBingkai('tegak'));
   document.querySelectorAll('.pilih-foto').forEach(inp => {
