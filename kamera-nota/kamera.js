@@ -1,5 +1,5 @@
 'use strict';
-/* Kamera nota v8 (inti v6) — Portal Asia Group · Supply Chain (kontrak: laporan-scm-finance-2026-10-14/BUILD.md § 5,
+/* Kamera nota v9 (inti v6) — Portal Asia Group · Supply Chain (kontrak: laporan-scm-finance-2026-10-14/BUILD.md § 5,
    foto-nota-v405-2026-10-16/BUILD.md § 6, foto-nota-v406-2026-10-16/BUILD.md § 2–§ 5,
    masukan-uji-v412-2026-10-20/BUILD.md § 4: pilihan bingkai Mendatar | Tegak,
    audit-laporan-v413-2026-10-20/BUILD.md § 5: antrean latar, unggah terasa ≤ 2 dtk).
@@ -36,7 +36,15 @@
    belakang; pilihan tidak disimpan di HP (kamera depan biasanya fokus tetap dan tanpa senter, jadi nota bisa buram).
    Pilihan berlaku selama halaman terbuka: kotak berikutnya, tab tampil lagi, dan Foto ulang memakai kamera yang sama.
    Kamera lain gagal menyala → kembali ke kamera sebelumnya dengan kalimat singkat, bukan layar "Kamera belum menyala".
-   Pratinjau TIDAK dicermin: tulisan nota terbaca sama dengan hasil foto. */
+   Pratinjau TIDAK dicermin: tulisan nota terbaca sama dengan hasil foto.
+   v9 (20 Nov 2026, laporan Jeffri 12.29 WIB dari Samsung A26, Chrome): layar kamera berkata "Kamera belakang belum bisa
+   dipakai di HP ini." dan admin tertahan di kamera depan (tombol Putar hilang). Sebab: arah yang diminta v8 hanya `ideal`.
+   Peramban memilih kamera dengan skor gabungan arah + ukuran; kamera belakang yang melaporkan ukuran kecil kalah dari kamera
+   depan yang sanggup 3264×2448, jadi permintaan "belakang" menyalakan kamera depan. Perbaikan: (1) kamera yang pernah
+   menyala ke suatu arah diingat (deviceId, hanya selama halaman terbuka) dan dipakai lagi persis saat Putar kembali;
+   (2) Putar meminta arah secara pasti (`exact`); (3) buka pertama yang meminta belakang tapi mendapat depan dimatikan dan
+   diminta lagi dengan arah pasti. HP yang memang tanpa kamera ke arah itu menolak `exact` (OverconstrainedError), lalu
+   jatuh ke permintaan v8 apa adanya. */
 (() => {
   const UJI = window.__ujiKameraNota || {};            // hanya diisi uji otomatis, untuk memperpendek jeda
   const $ = id => document.getElementById(id);
@@ -134,6 +142,7 @@
     bisaPutar: false,              // v8: HP ini punya ≥ 2 kamera dan arah kamera terbaca → tombol Putar tampil
     putarDari: '', pesanPutar: '', jamPutar: 0,   // v8: arah sebelum Putar (kembali ke sana bila kamera lain gagal)
     putarMati: false,              // v8: Putar terbukti tidak mengganti kamera di HP ini → tombol tetap disembunyikan
+    idKamera: {user: '', environment: ''},   // v9: deviceId kamera yang sudah menyala per arah; hanya di memori halaman
     foto: null, sibuk: false, terkirim: false, berubah: false, nomorPeriksa: 0, nomorKirim: 0, jamKembali: 0,
     hapus: {nota: null, barang: null}, sibukHapus: '',
     /* v6 */
@@ -947,15 +956,52 @@
   }
   /* Resolusi (BUILD v406 § 3): minta 3264×2448 (4:3); HP yang tidak sanggup menolak dengan OverconstrainedError →
      coba lagi tanpa ukuran. */
-  async function mintaKameraHP() {
-    const md = navigator.mediaDevices, hadap = S.hadap === 'user' ? 'user' : 'environment';   // v8: arah pilihan admin
+  const ditolakSyarat = e => !!e && (e.name === 'OverconstrainedError' || e.name === 'ConstraintNotSatisfiedError');
+  const hentikan = st => { try { st.getTracks().forEach(t => t.stop()); } catch (e) { /* sudah mati */ } };
+  function mintaVideo(syarat, ukuran) {
+    const v = Object.assign({}, syarat);
+    if (ukuran) Object.assign(v, {width: {ideal: 3264}, height: {ideal: 2448}, aspectRatio: {ideal: 4 / 3}});
+    return navigator.mediaDevices.getUserMedia({audio: false, video: v});
+  }
+  /* v8 apa adanya: arah ideal + ukuran, lalu tanpa ukuran. */
+  async function mintaArahIdeal(hadap) {
     try {
-      return await md.getUserMedia({audio: false, video: {facingMode: {ideal: hadap}, width: {ideal: 3264},
-        height: {ideal: 2448}, aspectRatio: {ideal: 4 / 3}}});
+      return await mintaVideo({facingMode: {ideal: hadap}}, true);
     } catch (e) {
-      if (!e || (e.name !== 'OverconstrainedError' && e.name !== 'ConstraintNotSatisfiedError')) throw e;
-      return md.getUserMedia({audio: false, video: {facingMode: {ideal: hadap}}});
+      if (!ditolakSyarat(e)) throw e;
+      return mintaVideo({facingMode: {ideal: hadap}}, false);
     }
+  }
+  /* v9: arah pasti. null = HP tidak punya kamera yang melaporkan arah ini (permintaan ditolak tanpa menyalakan kamera). */
+  async function mintaArahPasti(hadap) {
+    try { return await mintaVideo({facingMode: {exact: hadap}}, true); } catch (e) { if (!ditolakSyarat(e)) throw e; }
+    try { return await mintaVideo({facingMode: {exact: hadap}}, false); } catch (e) { if (!ditolakSyarat(e)) throw e; }
+    return null;
+  }
+  async function mintaKameraHP() {
+    const hadap = S.hadap === 'user' ? 'user' : 'environment';   // v8: arah pilihan admin
+    /* v9 (1): kamera yang sudah pernah menyala ke arah ini di halaman ini dipakai lagi persis (Putar kembali, kotak
+       berikutnya). deviceId basi (ditolak) dilupakan, lalu jalan biasa. */
+    const id = S.idKamera[hadap];
+    if (id) {
+      try { return await mintaVideo({deviceId: {exact: id}}, true); } catch (e) { if (!ditolakSyarat(e)) throw e; }
+      try { return await mintaVideo({deviceId: {exact: id}}, false); } catch (e) { if (!ditolakSyarat(e)) throw e; }
+      S.idKamera[hadap] = '';
+    }
+    /* v9 (2): sesudah Putar arah kamera HP ini sudah terbaca, jadi arah diminta pasti. */
+    if (S.putarDari) {
+      const st = await mintaArahPasti(hadap);
+      if (st) return st;
+      return mintaArahIdeal(hadap);
+    }
+    const st = await mintaArahIdeal(hadap);
+    /* v9 (3): diminta belakang, yang menyala kamera depan (Samsung A26, 20 Nov) → matikan, minta belakang secara pasti.
+       Tanpa kamera belakang, atau kamera belakang gagal menyala → kembali ke kamera yang tadi menyala (v8 apa adanya). */
+    if (hadap !== 'environment' || arahKamera(st.getVideoTracks()[0]) !== 'user') return st;
+    hentikan(st);
+    let lain = null;
+    try { lain = await mintaArahPasti('environment'); } catch (e) { lain = null; }
+    return lain || mintaArahIdeal(hadap);
   }
   /* Ketukan admin di kotak kosong / Foto ulang. v6 (unggah-foto-06): sisa waktu halaman < 10 menit → minta buka lagi
      dari Portal SEBELUM memotret, supaya foto yang sudah dijepret tidak ditolak. */
@@ -1104,6 +1150,7 @@
       S.putarMati = true;                                              // kotak berikutnya juga tanpa tombol
     }
     S.hadap = arah;
+    try { const id = st.getVideoTracks()[0].getSettings().deviceId; if (id) S.idKamera[arah] = String(id); } catch (e) { /* tanpa id */ }
     if (S.bisaPutar || (dari && arah === dari)) return tampilPutar();
     const md = navigator.mediaDevices;
     if (!md || typeof md.enumerateDevices !== 'function') return tampilPutar();
