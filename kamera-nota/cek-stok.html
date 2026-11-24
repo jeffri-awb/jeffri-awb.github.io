@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src https://script.google.com https://script.googleusercontent.com; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#ffffff" id="warna-tema">
+<title>Cek stok · Portal Asia Group</title>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
+<link rel="stylesheet" href="kamera.css?v=9">
+<link rel="stylesheet" href="cek-stok.css?v=1">
+</head>
+<body>
+<svg class="ikon-sumber" aria-hidden="true" focusable="false">
+  <symbol id="i-kamera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13.5" r="3.5"/></symbol>
+  <symbol id="i-cek" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-petir" viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/></symbol>
+  <symbol id="i-petir-mati" viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"/><path d="M3 3l18 18"/></symbol>
+  <symbol id="i-putar" viewBox="0 0 24 24"><path d="M21 4v6h-6"/><path d="M3 20v-6h6"/><path d="M5.1 9a8 8 0 0113.4-2.6L21 10M3 14l2.5 3.6A8 8 0 0018.9 15"/></symbol>
+</svg>
+<main class="app">
+
+<section id="muat" class="layar" aria-label="Cek stok" hidden>
+  <header class="atas">
+    <button type="button" class="kembali" id="m-kembali">‹ Kembali ke Portal</button>
+    <p class="cs-tutup-ket" id="m-tutup-ket" role="status" hidden>Tutup tab ini untuk kembali ke Portal.</p>
+    <span class="cs-pil">Cek stok</span>
+    <h1 class="judul">Cek stok</h1>
+    <p class="sub" id="m-sub"></p>
+  </header>
+  <div class="isi">
+    <p class="hasil info" id="m-memuat" role="status" aria-live="polite">Memuat daftar barang…</p>
+    <div id="m-gagal" hidden>
+      <p class="hasil gagal" id="m-gagal-isi" role="alert"></p>
+      <div class="aksi"><button type="button" class="btn primer" id="t-coba-daftar">Coba lagi</button></div>
+    </div>
+  </div>
+</section>
+
+<section id="barang" class="layar" aria-label="Cek stok" hidden>
+  <header class="atas">
+    <button type="button" class="kembali" id="b-kembali">‹ Kembali ke Portal</button>
+    <p class="cs-tutup-ket" id="b-tutup-ket" role="status" hidden>Tutup tab ini untuk kembali ke Portal.</p>
+    <span class="cs-pil">Cek stok</span>
+    <h1 class="judul" id="b-judul"></h1>
+    <p class="sub" id="b-sub"></p>
+    <p class="cs-lewat" id="b-lewat" hidden></p>
+    <div class="cs-langkah" id="b-langkah" role="img"></div>
+  </header>
+  <div class="isi cs-isi">
+    <p class="hasil ok" id="b-kabar" role="status" aria-live="polite" hidden></p>
+    <div class="keadaan minta cs-kartu" id="b-kartu">
+      <b id="b-nama"></b>
+      <span class="k-catatan">Hitung semua botol di rak bar dan gudang. Foto barangnya, lalu ketik jumlah yang kamu hitung. Kalau tidak ada, foto raknya dan ketik 0.</span>
+      <span class="k-oleh">Cek stok hari ini</span>
+    </div>
+    <p class="cs-sebelum" id="b-sebelum" hidden></p>
+    <div class="slot cs-foto" id="b-foto"></div>
+    <div class="cs-jumlah">
+      <label for="b-jumlah">Jumlah dihitung</label>
+      <span class="cs-angka">
+        <input type="text" id="b-jumlah" inputmode="numeric" pattern="[0-9]*" autocomplete="off" enterkeyhint="done" spellcheck="false" required aria-required="true" aria-describedby="b-satuan b-jumlah-pesan">
+        <span id="b-satuan">botol</span>
+      </span>
+    </div>
+    <p class="slot-pesan" id="b-jumlah-pesan" role="alert" hidden></p>
+  </div>
+  <footer class="kaki">
+    <p class="hasil" id="b-hasil" role="status" aria-live="polite" hidden></p>
+    <button type="button" class="btn primer" id="t-simpan" disabled aria-describedby="b-simpan-ket"></button>
+    <p class="catatan" id="b-simpan-ket"></p>
+    <button type="button" class="btn cs-batal" id="t-batal-ulang" hidden>Batal hitung ulang</button>
+  </footer>
+</section>
+
+<section id="kamera" class="kam barang" aria-label="Kamera" hidden>
+  <header class="kam-atas">
+    <button type="button" class="kam-x" id="kam-tutup" aria-label="Tutup kamera, kembali ke barang">✕</button>
+    <div class="kam-judul"><b id="kam-apa">Foto barang</b><span id="kam-kertas"></span></div>
+    <button type="button" class="kam-putar" id="kam-putar" aria-label="Putar ke kamera depan" hidden><svg aria-hidden="true"><use href="#i-putar"/></svg><span>Putar</span></button>
+  </header>
+  <div class="kam-bidik" id="kam-bidik">
+    <video id="kam-video" playsinline muted autoplay></video>
+    <div class="kam-panduan" id="kam-panduan">
+      <p class="kam-petunjuk" id="kam-petunjuk">Semua botol masuk layar</p>
+    </div>
+    <p class="kam-ket" id="kam-ket" role="status" aria-live="polite">Menyalakan kamera…</p>
+  </div>
+  <div class="kam-bawah">
+    <div class="kam-sisi">
+      <button type="button" class="kam-alat" id="kam-flash" aria-pressed="true" hidden><svg aria-hidden="true"><use href="#i-petir"/></svg><span>Flash</span></button>
+    </div>
+    <button type="button" class="kam-rana" id="kam-rana" aria-label="Ambil foto" disabled><i></i></button>
+    <div class="kam-sisi"></div>
+  </div>
+</section>
+
+<section id="tolak" class="layar" aria-label="Kamera belum menyala" hidden>
+  <header class="atas">
+    <button type="button" class="kembali" id="t-tolak-kembali">‹ Kembali</button>
+    <h1 class="judul" id="tolak-judul">Kamera belum menyala</h1>
+    <p class="sub" id="tolak-sub"></p>
+  </header>
+  <div class="isi">
+    <p class="hasil tunggu" id="tolak-isi"></p>
+    <div class="aksi">
+      <button type="button" class="btn primer" id="t-coba-kamera">Coba nyalakan kamera lagi</button>
+    </div>
+  </div>
+</section>
+
+<section id="selesai" class="layar" aria-label="Cek stok selesai" hidden>
+  <header class="atas">
+    <span class="cs-pil">Cek stok</span>
+    <h1 class="judul">Semua barang sudah dikirim</h1>
+    <p class="sub" id="s-sub"></p>
+  </header>
+  <div class="isi">
+    <ul class="cs-daftar" id="s-daftar"></ul>
+    <div class="aksi">
+      <button type="button" class="btn primer" id="t-selesai-kembali">Kembali ke Portal</button>
+      <p class="cs-tutup-ket" id="s-tutup-ket" role="status" hidden>Tutup tab ini untuk kembali ke Portal.</p>
+    </div>
+  </div>
+</section>
+
+<section id="pesan" class="layar" aria-label="Cek stok" hidden>
+  <header class="atas">
+    <span class="cs-pil">Cek stok</span>
+    <h1 class="judul" id="pesan-judul">Cek stok</h1>
+  </header>
+  <div class="isi">
+    <p class="hasil info" id="pesan-isi"></p>
+    <div class="aksi">
+      <button type="button" class="btn primer" id="t-pesan-kembali">Kembali ke Portal</button>
+      <p class="cs-tutup-ket" id="p-tutup-ket" role="status" hidden>Tutup tab ini untuk kembali ke Portal.</p>
+    </div>
+  </div>
+</section>
+
+<div class="pop" id="pop" hidden>
+  <div class="pop-kotak" role="alertdialog" aria-modal="true" aria-labelledby="pop-judul" aria-describedby="pop-isi">
+    <h2 id="pop-judul"></h2>
+    <p id="pop-isi"></p>
+    <button type="button" class="btn primer" id="pop-tombol"></button>
+  </div>
+</div>
+
+</main>
+<script src="cek-stok.js?v=1"></script>
+</body>
+</html>

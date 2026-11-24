@@ -9,4 +9,5 @@ Sumber: repo privat `jeff-headquarter`, folder `_Sistem/vps/halaman-awi-kurir/`.
 Halaman kamera untuk menu Foto nota di Portal Asia Group (HP admin cabang). Statis, tanpa pustaka luar, tanpa data:
 semua isian (alamat Portal, token foto sekali pakai, faktur) datang dari Portal lewat fragmen `#` yang tidak terkirim
 ke hosting. Foto hanya di memori HP lalu langsung dikirim ke Portal. Sumber dan ujinya: repo privat `jeff-headquarter`,
-folder `bangun/portal-asia-group/kamera-nota/` (yang diunggah hanya `index.html`, `kamera.css`, `kamera.js`).
+folder `bangun/portal-asia-group/kamera-nota/` (yang diunggah hanya `index.html`, `kamera.css`, `kamera.js`, dan sejak
+24 Nov 2026 `cek-stok.html`, `cek-stok.css`, `cek-stok.js` untuk tab Cek stok: foto barang dan jumlah hitung).
