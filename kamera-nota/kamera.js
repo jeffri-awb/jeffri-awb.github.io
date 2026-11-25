@@ -1,5 +1,5 @@
 'use strict';
-/* Kamera nota v9 (inti v6) — Portal Asia Group · Supply Chain (kontrak: laporan-scm-finance-2026-10-14/BUILD.md § 5,
+/* Kamera nota v10 (inti v6) — Portal Asia Group · Supply Chain (kontrak: laporan-scm-finance-2026-10-14/BUILD.md § 5,
    foto-nota-v405-2026-10-16/BUILD.md § 6, foto-nota-v406-2026-10-16/BUILD.md § 2–§ 5,
    masukan-uji-v412-2026-10-20/BUILD.md § 4: pilihan bingkai Mendatar | Tegak,
    audit-laporan-v413-2026-10-20/BUILD.md § 5: antrean latar, unggah terasa ≤ 2 dtk).
@@ -44,7 +44,22 @@
    menyala ke suatu arah diingat (deviceId, hanya selama halaman terbuka) dan dipakai lagi persis saat Putar kembali;
    (2) Putar meminta arah secara pasti (`exact`); (3) buka pertama yang meminta belakang tapi mendapat depan dimatikan dan
    diminta lagi dengan arah pasti. HP yang memang tanpa kamera ke arah itu menolak `exact` (OverconstrainedError), lalu
-   jatuh ke permintaan v8 apa adanya. */
+   jatuh ke permintaan v8 apa adanya.
+   v10 (25 Nov 2026, laporan Jeffri 16.47 WIB dari HP admin: "Belum terkirim. Muat ulang halaman ini." dan Foto barang
+   dijawab pop-up "Muat ulang halaman ini"; muat ulang dan masuk ulang berkali-kali tetap sama). Sebab: penyimpanan foto di
+   HP (IndexedDB) tidak menjawab saat halaman dibuka (ditiru: tab lain memegang tempat 'antrean'), jadi antreannya tidak
+   pernah terbaca dan v6 K3 mengunci halaman. Muat ulang hanya membuka koneksi baru ke penyimpanan yang sama. Pilihan Jeffri
+   (kartu keputusan 25 Nov, "Tidak mengunci + lapor ke Log"):
+   (1) antrean yang BELUM PERNAH terbaca tidak lagi mengunci: foto baru dan Hapus foto Portal lewat jalur sinkron v5 (layar
+       kirim "Penyimpanan HP macet: foto dikirim langsung"), kartu "Penyimpanan foto di HP ini macet" menjelaskan. Kunci K3
+       tetap untuk faktur yang diketahui masih punya foto di HP (antrean pernah terbaca), karena di situ muat ulang menolong
+       dan jalur v5 akan mengacak urutannya. Harga yang diterima: foto lama yang tersembunyi di penyimpanan yang macet
+       (belum pernah terkirim, faktur sama) dikirim sesudah foto baru begitu penyimpanannya jalan lagi; Portal menolaknya
+       dengan kotak merah (set nota berubah / nota sudah difoto), tidak menimpa diam-diam.
+   (2) penyimpanan macet, penuh, atau tidak bisa dibuka dilaporkan SEKALI per halaman ke Portal (doPost nota-galat) →
+       Log › Gagal "Menyimpan foto di HP". Isinya hanya nama galat dan angka: tahap, antrean pernah terbaca, jumlah tab Kamera
+       nota v10 lain yang terbuka (BroadcastChannel 'kamera-nota-tab'), pemakaian/jatah penyimpanan situs (MB), RAM HP (GB),
+       detik sejak halaman dibuka. Tanpa foto, faktur, atau isi antrean. Gagal melapor = diam. */
 (() => {
   const UJI = window.__ujiKameraNota || {};            // hanya diisi uji otomatis, untuk memperpendek jeda
   const $ = id => document.getElementById(id);
@@ -132,6 +147,11 @@
   const BELUM_HAPUS_PENUH = 'Belum bisa dihapus: memori HP penuh. Kosongkan sedikit memori HP, lalu coba lagi.';
   const KIRIM_PENUH = 'Memori HP penuh: foto dikirim langsung';
   const IDB_DIAM = UJI.idbDiam || 10000;               // transaksi tanpa kabar selama ini = koneksi dianggap putus
+  /* v10: antrean belum pernah terbaca karena penyimpanan HP macet → tidak mengunci; foto baru dikirim langsung */
+  const KARTU_MACET = ['Penyimpanan foto di HP ini macet',
+    'Foto tetap bisa diambil dan langsung dikirim. Supaya lancar lagi, tutup tab Kamera nota yang lain, lalu muat ulang halaman ini.'];
+  const KIRIM_MACET = 'Penyimpanan HP macet: foto dikirim langsung';
+  const VERSI_KAMERA = 'k10', KANAL_TAB = 'kamera-nota-tab', TUNGGU_TAB = UJI.tungguTab || 500;
 
   const S = {
     p: null,                       // fragmen yang sudah diperiksa (v=2 atau v=3)
@@ -306,7 +326,7 @@
      di HP untuk faktur ini), bukan cocok dan bukan ditolak (Portal hanya menerima set baru / foto barang saat ditolak). */
   function bisaTambah() {
     return S.p.v === '3' && !cocok() && S.status !== 'ditolak' && S.nota.length >= 1 && S.nota.length < HAL_MAKS
-      && !!S.set && !urutanSlot('nota').length && !S.sibukHapus && !S.tokenMati && !DB.rusak;
+      && !!S.set && !urutanSlot('nota').length && !S.sibukHapus && !S.tokenMati && !perluMuatUlang();   // v10: macet = jalur v5
   }
 
   /* Kotak keadaan sesudah jawaban Portal (BUILD v406 § 2 + § 6.4): tolakan/permintaan berakhir begitu kotak targetnya
@@ -361,7 +381,8 @@
      (v6 K3: halaman minta dimuat ulang); terbaca = isi antrean pernah terbaca utuh di halaman ini. */
   /* penuh (G3-K3-01): tulisan terakhir ke IndexedDB ditolak pada koneksi yang sehat (memori HP penuh); hilang lagi begitu
      ada put yang berhasil */
-  const DB = {db: null, buka: null, pernah: false, rusak: false, terbaca: false, penuh: false};
+  /* sebabBuka (v10): kenapa pembukaan terakhir gagal ('waktu' | 'blokir' | nama galat | 'tidak-ada'), untuk laporan */
+  const DB = {db: null, buka: null, pernah: false, rusak: false, terbaca: false, penuh: false, sebabBuka: ''};
   function idbBuka() {
     if (DB.buka) return DB.buka;
     DB.buka = new Promise(res => {
@@ -374,8 +395,8 @@
         if (db) DB.pernah = true;
         res(db);
       };
-      jam = setTimeout(() => akhir(null), 3000);
-      try { r = window.indexedDB.open(NAMA_DB, 1); } catch (e) { return akhir(null); }   // mode privat / diblokir: jalur v5
+      jam = setTimeout(() => { DB.sebabBuka = 'waktu'; akhir(null); }, 3000);
+      try { r = window.indexedDB.open(NAMA_DB, 1); } catch (e) { DB.sebabBuka = 'tidak-ada'; return akhir(null); }   // mode privat / diblokir: jalur v5
       r.onupgradeneeded = () => { try { r.result.createObjectStore(TOKO, {keyPath: 'idFoto'}); } catch (e) { /* sudah ada */ } };
       r.onsuccess = () => {
         const db = r.result;
@@ -385,8 +406,8 @@
         db.onclose = () => lepasIdb(db);
         akhir(db);
       };
-      r.onerror = () => akhir(null);
-      r.onblocked = () => akhir(null);
+      r.onerror = () => { DB.sebabBuka = namaGalat(r.error) || 'galat'; akhir(null); };
+      r.onblocked = () => { DB.sebabBuka = 'blokir'; akhir(null); };
     });
     return DB.buka;
   }
@@ -435,7 +456,10 @@
   /* Tulisan ditolak dengan galat isi/ruang (bukan koneksi) = memori HP penuh: QuotaExceededError di mana pun, atau
      galat transaksi pada koneksi yang baru berhasil dibuka (dipanggil hanya untuk percobaan itu). */
   function catatPenuh(mode, e, koneksiBaru) {
-    if (mode === 'readwrite' && !!e && (e.name === 'QuotaExceededError' || (koneksiBaru && !!e.dariTransaksi))) DB.penuh = true;
+    if (mode === 'readwrite' && !!e && (e.name === 'QuotaExceededError' || (koneksiBaru && !!e.dariTransaksi))) {
+      DB.penuh = true;
+      laporGalat('penuh', 'tulis', e);                         // v10: sekali per halaman
+    }
   }
   /* v6 K3: koneksi putus → lepas, buka koneksi baru, ulangi SEKALI (pekerjaannya satu transaksi: yang batal tidak menulis
      apa pun — yang diam dibatalkan lebih dulu (G3-K3-02); bila abort() terlambat karena transaksinya sudah selesai,
@@ -451,9 +475,9 @@
     try { return await idbKerjaSekali(mode, kerja); } catch (e) {
       if (!putusIdb(e)) { catatPenuh(mode, e, false); throw e; }
       lepasIdb(db0);
-      if (!(await idbBuka())) { tandaiIdbRusak(); throw e; }
+      if (!(await idbBuka())) { tandaiIdbRusak('buka', null); throw e; }
       try { return await idbKerjaSekali(mode, kerja); } catch (e2) {
-        if (putusIdb(e2) && !(e2.dariTransaksi && mode === 'readwrite')) { lepasIdb(DB.db); tandaiIdbRusak(); } else catatPenuh(mode, e2, true);
+        if (putusIdb(e2) && !(e2.dariTransaksi && mode === 'readwrite')) { lepasIdb(DB.db); tandaiIdbRusak(mode === 'readwrite' ? 'tulis' : 'baca', e2); } else catatPenuh(mode, e2, true);
         throw e2;
       }
     }
@@ -464,14 +488,16 @@
     if (DB.db) return DB.db;
     if (!DB.pernah || DB.rusak) return null;
     const db = await idbBuka();
-    if (!db) tandaiIdbRusak();
+    if (!db) tandaiIdbRusak('buka', null);
     return db;
   }
-  function tandaiIdbRusak() {
+  /* tahap 'baca' | 'tulis' | 'buka' dan galatnya hanya untuk laporan v10 */
+  function tandaiIdbRusak(tahap, e) {
     if (DB.rusak) return;
     DB.rusak = true;
     clearTimeout(jamBangun);                                    // putaran 2 dtk berhenti: halaman tidak bisa mengirim lagi
     if (S.p) segarkan();
+    laporGalat('macet', tahap, e);
   }
   const idbSemua = () => idbKerja('readonly', st => st.getAll());
   /* put yang berhasil = ada ruang lagi (G3-K3-01); delete tidak membuktikan apa pun karena tidak butuh ruang */
@@ -557,9 +583,11 @@
      cabangnya sendiri; foto cabang lain menunggu halaman cabang itu. */
   const cabangIni = x => !!S.p && x.idOutlet === S.p.o;
   const antreSendiri = () => S.antre.filter(x => milikAkun(x) && cabangIni(x) && x.status === 'antre' && !umurLewat(x));
-  /* v6 K3: antrean rusak dan faktur ini masih punya foto/hapus di HP (atau antreannya belum pernah terbaca) → jangan
-     memotret atau menghapus dulu: jalur v5 akan mengacak urutan per faktur. Muat ulang = koneksi baru. */
-  const perluMuatUlang = () => DB.rusak && (!DB.terbaca || S.antre.some(x => fakturIni(x) && milikAkun(x) && !umurLewat(x)));
+  /* v6 K3: antrean rusak dan faktur ini masih punya foto/hapus di HP → jangan memotret atau menghapus dulu: jalur v5 akan
+     mengacak urutan per faktur. Muat ulang = koneksi baru.
+     v10: antrean yang BELUM PERNAH terbaca (penyimpanan HP macet sejak halaman dibuka) tidak lagi mengunci. Muat ulang tidak
+     menolong selama penyebabnya ada (tab lain menahan, HP lambat), jadi dulu halaman buntu. Foto baru lewat jalur v5. */
+  const perluMuatUlang = () => DB.rusak && DB.terbaca && S.antre.some(x => fakturIni(x) && milikAkun(x) && !umurLewat(x));
 
   /* ---------- layar ---------- */
   function tampil(nama) {
@@ -773,6 +801,7 @@
     const sendiri = antreSendiri(), tunggu = sendiri.filter(x => x.jenis === 'foto');
     /* token mati didahulukan: muat ulang tidak menolong, halaman baru dari Portal yang menolong */
     const kartuToken = S.tokenMati && tunggu.length > 0, kartuRusak = !S.tokenMati && DB.rusak && (sendiri.length > 0 || !DB.terbaca);
+    const macet = kartuRusak && !DB.terbaca;                  // v10: antrean tidak pernah terbaca, halaman tidak mengunci
     kartu.hidden = !(kartuToken || kartuRusak);
     $('t-muat-ulang').hidden = !kartuRusak;
     $('t-tutup3').hidden = kartuRusak;
@@ -783,8 +812,8 @@
         ? 'Fotonya tetap di HP ini dan terkirim sesudah halaman dibuka lagi.'
         : 'Foto yang belum terkirim perlu difoto ulang sesudah dibuka lagi.');
     } else if (kartuRusak) {
-      $('kartu-judul').textContent = KARTU_RUSAK[0];
-      $('kartu-isi').textContent = KARTU_RUSAK[1];
+      $('kartu-judul').textContent = (macet ? KARTU_MACET : KARTU_RUSAK)[0];
+      $('kartu-isi').textContent = (macet ? KARTU_MACET : KARTU_RUSAK)[1];
     }
   }
   function idServerTampil(apa) {
@@ -1355,7 +1384,7 @@
     $('kirim-img').alt = NAMA[apa] + ' ' + S.p.f;
     $('kirim-img').src = url;
     $('kirim-img').hidden = false;
-    langkah(1, 'beres', penuh ? KIRIM_PENUH : sumber === 'kamera' && apa === 'nota' ? 'Foto dirapikan sesuai kotak' : 'Foto dirapikan');
+    langkah(1, 'beres', penuh ? KIRIM_PENUH : DB.rusak ? KIRIM_MACET : sumber === 'kamera' && apa === 'nota' ? 'Foto dirapikan sesuai kotak' : 'Foto dirapikan');
     kirim();
   }
   function bacaGambar(berkas) {
@@ -1887,6 +1916,62 @@
     };
   }
 
+  /* ---------- v10: laporan penyimpanan HP ke Portal (Log › Gagal) ----------
+     Setiap halaman v10 menjawab panggilan 'siapa' di kanal KANAL_TAB, jadi halaman yang melapor bisa menghitung tab Kamera
+     nota lain yang terbuka (petunjuk sebab: tab lain memegang penyimpanan). Halaman v9 ke bawah tidak menjawab. */
+  const idKanal = idAcak();
+  let kanalTab = null;
+  try { if (typeof BroadcastChannel === 'function') kanalTab = new BroadcastChannel(KANAL_TAB); } catch (e) { kanalTab = null; }
+  if (kanalTab) {
+    kanalTab.onmessage = e => {
+      const m = e && e.data;
+      if (m && m.jenis === 'siapa' && HEX24.test(String(m.dari)) && m.dari !== idKanal) {
+        try { kanalTab.postMessage({jenis: 'ada', ke: m.dari, dari: idKanal}); } catch (x) { /* diam */ }
+      }
+    };
+  }
+  /* jumlah tab Kamera nota v10 lain yang menjawab dalam TUNGGU_TAB ms; -1 = tidak bisa dihitung */
+  function hitungTabLain() {
+    if (typeof BroadcastChannel !== 'function') return Promise.resolve(-1);
+    return new Promise(res => {
+      let k = null;
+      const ada = new Set();
+      try { k = new BroadcastChannel(KANAL_TAB); } catch (e) { return res(-1); }
+      k.onmessage = e => { const m = e && e.data; if (m && m.jenis === 'ada' && m.ke === idKanal && HEX24.test(String(m.dari))) ada.add(m.dari); };
+      setTimeout(() => { try { k.close(); } catch (e) { /* diam */ } res(ada.size); }, TUNGGU_TAB);
+      try { k.postMessage({jenis: 'siapa', dari: idKanal}); } catch (e) { /* tetap dijawab 0 */ }
+    });
+  }
+  /* pemakaian dan jatah penyimpanan situs (MB); -1 = tidak diketahui. Paling lama TUNGGU_TAB ms. */
+  function ukurSimpan() {
+    const kosong = {pakai: -1, jatah: -1};
+    try {
+      if (!navigator.storage || typeof navigator.storage.estimate !== 'function') return Promise.resolve(kosong);
+      const mb = v => (typeof v === 'number' && isFinite(v) && v >= 0 ? Math.round(v / 1048576) : -1);
+      return Promise.race([navigator.storage.estimate().then(x => ({pakai: mb(x && x.usage), jatah: mb(x && x.quota)}), () => kosong),
+        tunggu(TUNGGU_TAB).then(() => kosong)]);
+    } catch (e) { return Promise.resolve(kosong); }
+  }
+  function namaGalat(e) { return String((e && e.name) || '').replace(/[^A-Za-z]/g, '').slice(0, 40); }
+  const dilapor = new Set();
+  /* Sekali per sebab per halaman ('macet' | 'penuh' | 'buka'). Hanya halaman v=3 yang dibuka Portal dengan token yang masih
+     berlaku. Jawaban Portal diabaikan; galat kirim ditelan (admin tidak perlu tahu, kirim foto tidak ikut tertahan). */
+  async function laporGalat(sebab, tahap, e) {
+    const p = S.p;
+    if (!p || p.v !== '3' || !p.api || !p.t || S.tokenMati || dilapor.has(sebab)) return;
+    dilapor.add(sebab);
+    const galat = namaGalat(e) || (tahap === 'buka' ? String(DB.sebabBuka || '').replace(/[^A-Za-z-]/g, '').slice(0, 40) : '');
+    try {
+      const [tabLain, simpan] = await Promise.all([hitungTabLain(), ukurSimpan()]);
+      const ram = Number(navigator.deviceMemory);
+      const badan = JSON.stringify({jenis: 'nota-galat', t: p.t, idOutlet: p.o, sebab, tahap: tahap || '', galat,
+        terbaca: !!DB.terbaca, tabLain, pakai: simpan.pakai, jatah: simpan.jatah, ram: isFinite(ram) && ram > 0 ? ram : -1,
+        detik: Math.round(performance.now() / 1000), versi: VERSI_KAMERA, hp: /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '')});
+      if (S.p !== p) return;
+      await kirimSekali(badan);
+    } catch (x) { /* laporan hilang: tidak diulang */ }
+  }
+
   /* ---------- v6: Selesai / ‹ Kembali dengan antrean belum kosong (rancangan A7) ---------- */
   function tutupAman() {
     tutupPopup(false);
@@ -2020,6 +2105,8 @@
   async function siapkanAntrean() {
     if (!S.p || S.p.v !== '3') return;
     const db = await idbBuka();
+    /* v10: penyimpanan tidak bisa dibuka (bukan mode privat/tanpa IndexedDB) = jalur v5 seperti dulu, kini dilaporkan */
+    if (!db && S.p && DB.sebabBuka && DB.sebabBuka !== 'tidak-ada') laporGalat('buka', 'buka', null);
     if (!db || !S.p) return;
     await sapuKedaluwarsa();
     await muatAntrean();
